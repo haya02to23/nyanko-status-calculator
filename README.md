@@ -1,36 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# にゃんこステータス計算機
 
-## Getting Started
+にゃんこ大戦争のキャラステータス計算ツール。キャラ名で検索して、レベル・本能・にゃんコンボを選ぶと体力・攻撃力・DPSなどを自動計算します。
 
-First, run the development server:
+## 機能
+
+- キャラ名のインクリメンタル検索(ひらがな/カタカナどちらでも可)
+- 形態切替(第1〜第4形態)
+- レベル+値、日本編お宝(×2.5)の反映
+- 本能のレベル別効果(体力/攻撃力/速度/コスト/生産スピード/攻撃間隔 + 能力解放系)
+- にゃんコンボ(攻撃力/体力/移動速度アップ系を数値反映、構成キャラ表示つき)
+- battlecats-db と同じ基準の表示(コストは第2章基準、再生産は研究力MAX込み)
+
+## データソース
+
+- ステータス・本能・コンボ: [fieryhenry/BCData](https://github.com/fieryhenry/BCData) の日本版 15.0.0jp
+- 攻撃頻度・後隙: [battlecatsinfo](https://github.com/battlecatsinfo/battlecatsinfo.github.io) の catstat.tsv
+- 列定義の参考: [fieryhenry/tbcml](https://github.com/fieryhenry/tbcml)
+
+`raw_data/` に元CSVを同梱。データ更新時は新しいバージョンのCSVに差し替えて:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+node scripts/build-data.mjs   # public/data/*.json を再生成
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 開発
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 計算式メモ
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- レベル倍率は整数%で累積(`unitlevel.csv` の10レベル毎成長率)。浮動小数だと公表値と1ズレる
+- 表示ステータス = floor(floor(基礎値 × 倍率%/100) × お宝倍率) → 本能% → コンボ%
+- 検証済み: 覚醒のネコムート Lv30/Lv50、ゼロカムイ Lv50 が battlecats-db の公表値と一致
