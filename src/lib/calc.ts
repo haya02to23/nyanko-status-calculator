@@ -186,12 +186,13 @@ export type EffectiveRow = {
   label: string; // 対象の説明
   atkMult: number;
   hpMult: number;
-  atk: number; // 実質攻撃力
+  atk: number; // 実質攻撃力(全ヒット合計)
   hp: number; // 実質体力
   dps: number; // 実質DPS
+  atkHits: number[]; // 各ヒットの実質ダメージ
 };
 
-export type EffectiveBase = { atk: number; hp: number; dps: number };
+export type EffectiveBase = { atk: number; hp: number; dps: number; atkHits: number[] };
 
 // 未来編お宝(対属性効果)の対象となる属性。これらの敵にはお宝コンプで倍率が強化される。
 // massive_t = resist_t = 1, good_atk_t = 0.3, good_hp_t = 0.1 (treasures[23]=300時)
@@ -234,6 +235,7 @@ export function effectiveRows(
       atk: Math.round(base.atk * atkMult),
       hp: Math.round(base.hp * hpMult),
       dps: Math.round(base.dps * atkMult),
+      atkHits: base.atkHits.map((a) => Math.round(a * atkMult)),
     });
   };
 

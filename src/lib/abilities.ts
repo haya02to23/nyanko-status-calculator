@@ -86,6 +86,31 @@ export function abilityTexts(form: CatForm): string[] {
   return out;
 }
 
+// 各攻撃(ヒット)の射程帯ラベル。atk>0 のヒットのみ、calcStats の atkHits と同じ順。
+// long distance(遠方範囲)があればその帯、無ければ「〜射程」を返す。
+export function activeHitRanges(form: CatForm): string[] {
+  const lds = [form.ld, form.ld2, form.ld3];
+  const out: string[] = [];
+  form.atk.forEach((dmg, i) => {
+    if (dmg <= 0) return;
+    const ld = lds[i];
+    if (ld && !(ld.start === 0 && ld.range === 0)) {
+      const lo = Math.min(ld.start, ld.start + ld.range);
+      const hi = Math.max(ld.start, ld.start + ld.range);
+      out.push(`${lo}〜${hi}`);
+    } else {
+      out.push(`0〜${form.range}`);
+    }
+  });
+  return out;
+}
+
+// 連続攻撃で、ヒットごとに射程帯が異なるか(イザナギ・フォノウ等)
+export function hasVariedRanges(form: CatForm): boolean {
+  const ranges = activeHitRanges(form);
+  return ranges.length >= 2 && new Set(ranges).size >= 2;
+}
+
 // 攻撃タイプ表示 (単体/範囲、遠方範囲)
 export function attackTypeText(form: CatForm): string {
   const parts: string[] = [form.area ? "範囲攻撃" : "単体攻撃"];

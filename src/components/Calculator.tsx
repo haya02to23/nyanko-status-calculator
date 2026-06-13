@@ -18,7 +18,13 @@ import {
   TALENT_CD_DOWN,
   TALENT_INTERVAL_DOWN,
 } from "@/lib/calc";
-import { abilityTexts, attackTypeText, targetTraits } from "@/lib/abilities";
+import {
+  abilityTexts,
+  attackTypeText,
+  targetTraits,
+  activeHitRanges,
+  hasVariedRanges,
+} from "@/lib/abilities";
 
 // ひらがな→カタカナにして大文字小文字を無視した検索用キー
 const norm = (s: string) =>
@@ -198,13 +204,17 @@ export default function Calculator() {
     if (!resolved || !result) return [];
     return effectiveRows(
       resolved,
-      { atk: result.atk, hp: result.hp, dps: result.dps },
+      { atk: result.atk, hp: result.hp, dps: result.dps, atkHits: result.atkHits },
       treasure > 1 // お宝フル時は対属性お宝(超ダメ4倍等)も適用
     );
   }, [resolved, result, treasure]);
 
   const strengthen = resolved?.strengthen ?? null;
   const crit = resolved?.crit ?? null;
+
+  // 連続攻撃でヒットごとに射程が異なる場合の各ヒット射程帯
+  const hitRanges = useMemo(() => (form ? activeHitRanges(form) : []), [form]);
+  const variedRanges = form ? hasVariedRanges(form) : false;
 
   const unitName = (id: number, f: number) =>
     cats?.find((c) => c.id === id)?.forms[f]?.name ?? `No.${id + 1}`;
@@ -472,6 +482,60 @@ export default function Calculator() {
                   ? "未来編お宝コンプ相当で、赤/浮/黒/天使/エイリアン/ゾンビ/メタルへの超ダメージは4倍に強化済み(古代/無属性/悪魔は対象外で3倍)。"
                   : "お宝なし設定のため対属性強化なし(超ダメージ3倍)。"}
                 本能による倍率強化(超本能の超ダメ強化等)は未反映。
+              </p>
+            </section>
+          )}
+
+          {/* 連続攻撃の内訳(ヒットごとに射程が違う場合) */}
+          {variedRanges && (
+            <section className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-black/20">
+              <h3 className="text-sm font-bold text-brand">
+                連続攻撃の内訳
+                <span className="ml-2 text-xs font-normal text-ink-dim">
+                  攻撃ごとに射程が異なります
+                </span>
+              </h3>
+              {effective.length > 0 ? (
+                effective.map((r) => (
+                  <div key={r.label} className="mt-3">
+                    <p className="text-xs text-emerald-400">
+                      {r.label}
+                      {r.atkMult !== 1 && ` 攻×${r.atkMult}`}
+                    </p>
+                    <ul className="mt-1 space-y-1">
+                      {r.atkHits.map((dmg, i) => (
+                        <li
+                          key={i}
+                          className="flex items-baseline justify-between border-b border-line/60 pb-1 text-sm last:border-0"
+                        >
+                          <span className="text-ink-dim">
+                            {["①", "②", "③", "④"][i]} 射程 {hitRanges[i] ?? "-"}
+                          </span>
+                          <span className="font-bold tabular-nums text-emerald-300">
+                            {dmg.toLocaleString()}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              ) : (
+                <ul className="mt-3 space-y-1">
+                  {result.atkHits.map((dmg, i) => (
+                    <li
+                      key={i}
+                      className="flex items-baseline justify-between border-b border-line/60 pb-1 text-sm last:border-0"
+                    >
+                      <span className="text-ink-dim">
+                        {["①", "②", "③", "④"][i]} 射程 {hitRanges[i] ?? "-"}
+                      </span>
+                      <span className="font-bold tabular-nums">{dmg.toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="mt-2 text-[11px] text-ink-dim">
+                ※敵との距離で当たるヒットが変わります。各行は本能・コンボ・対象補正込みの1ヒット分の実質ダメージです。
               </p>
             </section>
           )}
