@@ -31,7 +31,7 @@ const RARITY_COLORS = [
   "bg-teal-600",
   "bg-sky-600",
   "bg-violet-600",
-  "bg-amber-500",
+  "bg-brand",
   "bg-rose-600",
 ];
 
@@ -233,7 +233,7 @@ export default function Calculator() {
       </p>
     );
   if (!cats || !combosAll || !meta)
-    return <p className="p-8 text-center text-stone-400 animate-pulse">データ読み込み中…</p>;
+    return <p className="p-8 text-center text-ink-dim animate-pulse">データ読み込み中…</p>;
 
   const maxBase = cat ? cat.maxBase || 60 : 60;
   const maxPlus = cat ? cat.maxPlus : 0;
@@ -241,20 +241,20 @@ export default function Calculator() {
   return (
     <div className="mx-auto max-w-3xl px-4 pb-24">
       {/* 検索 */}
-      <div className="sticky top-0 z-20 -mx-4 bg-stone-950/95 px-4 pb-2 pt-3 backdrop-blur">
+      <div className="sticky top-0 z-20 -mx-4 bg-sunken/95 px-4 pb-2 pt-3 backdrop-blur">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="キャラ名で検索 (例: ムート、かさじぞう)"
-          className="w-full rounded-xl border border-stone-700 bg-stone-900 px-4 py-3 text-base outline-none focus:border-amber-500"
+          className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-base outline-none focus:border-brand"
         />
         {searchResults.length > 0 && (
-          <ul className="absolute left-4 right-4 z-30 mt-1 max-h-80 overflow-auto rounded-xl border border-stone-700 bg-stone-900 shadow-2xl">
+          <ul className="absolute left-4 right-4 z-30 mt-1 max-h-80 overflow-auto rounded-xl border border-line bg-surface shadow-2xl">
             {searchResults.map(({ cat: c, matched }) => (
               <li key={c.id}>
                 <button
                   onClick={() => selectCat(c)}
-                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-stone-800"
+                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-surface-2"
                 >
                   <span
                     className={`shrink-0 rounded px-1.5 py-0.5 text-xs text-white ${RARITY_COLORS[c.rarity]}`}
@@ -262,7 +262,7 @@ export default function Calculator() {
                     {meta.rarities[c.rarity]}
                   </span>
                   <span className="truncate">{matched}</span>
-                  <span className="ml-auto shrink-0 text-xs text-stone-500">No.{c.id + 1}</span>
+                  <span className="ml-auto shrink-0 text-xs text-ink-dim">No.{c.id + 1}</span>
                 </button>
               </li>
             ))}
@@ -271,21 +271,21 @@ export default function Calculator() {
       </div>
 
       {!cat && (
-        <div className="mt-10 text-center text-stone-400">
+        <div className="mt-10 text-center text-ink-dim">
           <p className="text-5xl">🐱</p>
           <p className="mt-4">キャラ名を検索して選択してください</p>
-          <p className="mt-2 text-sm text-stone-500">
+          <p className="mt-2 text-sm text-ink-dim">
             レベル・本能・にゃんコンボ・ダメージ補正込みの実質ステータスを計算します
           </p>
           {historyCats.length > 0 && (
             <div className="mx-auto mt-8 max-w-md text-left">
-              <p className="mb-2 text-xs text-stone-500">最近見たキャラ</p>
+              <p className="mb-2 text-xs text-ink-dim">最近見たキャラ</p>
               <div className="flex flex-wrap gap-1.5">
                 {historyCats.map((c) => (
                   <button
                     key={c.id}
                     onClick={() => selectCat(c)}
-                    className="flex items-center gap-1.5 rounded-full border border-stone-700 bg-stone-900 px-3 py-1.5 text-sm hover:border-amber-500"
+                    className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-sm hover:border-brand"
                   >
                     <span
                       className={`rounded px-1 py-0.5 text-[10px] text-white ${RARITY_COLORS[c.rarity]}`}
@@ -304,7 +304,7 @@ export default function Calculator() {
       {cat && form && result && (
         <div className="mt-4 space-y-4">
           {/* キャラヘッダ + 形態切替 */}
-          <section className="rounded-2xl border border-stone-800 bg-stone-900 p-4">
+          <section className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-black/20">
             <div className="flex items-center gap-2">
               <span
                 className={`rounded px-1.5 py-0.5 text-xs text-white ${RARITY_COLORS[cat.rarity]}`}
@@ -312,9 +312,9 @@ export default function Calculator() {
                 {meta.rarities[cat.rarity]}
               </span>
               <h2 className="text-lg font-bold">{form.name}</h2>
-              <span className="ml-auto text-xs text-stone-500">No.{cat.id + 1}</span>
+              <span className="ml-auto text-xs text-ink-dim">No.{cat.id + 1}</span>
             </div>
-            {form.desc && <p className="mt-1 text-xs text-stone-400">{form.desc}</p>}
+            {form.desc && <p className="mt-1 text-xs text-ink-dim">{form.desc}</p>}
             <div className="mt-3 flex flex-wrap gap-1.5">
               {cat.forms.map((f, i) => (
                 <button
@@ -322,8 +322,8 @@ export default function Calculator() {
                   onClick={() => selectForm(i)}
                   className={`rounded-lg px-3 py-1.5 text-sm ${
                     i === formIdx
-                      ? "bg-amber-500 font-bold text-stone-950"
-                      : "bg-stone-800 text-stone-300 hover:bg-stone-700"
+                      ? "bg-brand font-bold text-bg"
+                      : "bg-surface-2 text-ink hover:bg-surface-2"
                   }`}
                 >
                   {["第1", "第2", "第3", "第4"][i]}形態
@@ -334,7 +334,7 @@ export default function Calculator() {
             {/* レベル・お宝 */}
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <label className="block">
-                <span className="text-xs text-stone-400">レベル (最大{maxBase})</span>
+                <span className="text-xs text-ink-dim">レベル (最大{maxBase})</span>
                 <input
                   type="number"
                   min={1}
@@ -343,11 +343,11 @@ export default function Calculator() {
                   onChange={(e) =>
                     setLevel(Math.max(1, Math.min(maxBase, Number(e.target.value) || 1)))
                   }
-                  className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2 text-center text-lg font-bold outline-none focus:border-amber-500"
+                  className="mt-1 w-full rounded-lg border border-line bg-sunken px-3 py-2 text-center text-lg font-bold outline-none focus:border-brand"
                 />
               </label>
               <label className="block">
-                <span className="text-xs text-stone-400">＋値 (最大{maxPlus})</span>
+                <span className="text-xs text-ink-dim">＋値 (最大{maxPlus})</span>
                 <input
                   type="number"
                   min={0}
@@ -356,17 +356,17 @@ export default function Calculator() {
                   onChange={(e) =>
                     setPlus(Math.max(0, Math.min(maxPlus, Number(e.target.value) || 0)))
                   }
-                  className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2 text-center text-lg font-bold outline-none focus:border-amber-500"
+                  className="mt-1 w-full rounded-lg border border-line bg-sunken px-3 py-2 text-center text-lg font-bold outline-none focus:border-brand"
                 />
               </label>
               <div className="col-span-2">
-                <span className="text-xs text-stone-400">クイック設定 / 日本編お宝</span>
+                <span className="text-xs text-ink-dim">クイック設定 / 日本編お宝</span>
                 <div className="mt-1 flex gap-1.5">
                   {[30, 50, ...(maxBase >= 60 ? [60] : [])].map((lv) => (
                     <button
                       key={lv}
                       onClick={() => setLevel(Math.min(lv, maxBase))}
-                      className="rounded-lg bg-stone-800 px-2.5 py-2 text-sm hover:bg-stone-700"
+                      className="rounded-lg bg-surface-2 px-2.5 py-2 text-sm hover:bg-surface-2"
                     >
                       Lv{lv}
                     </button>
@@ -376,7 +376,7 @@ export default function Calculator() {
                       setLevel(maxBase);
                       setPlus(maxPlus);
                     }}
-                    className="rounded-lg bg-stone-800 px-2.5 py-2 text-sm hover:bg-stone-700"
+                    className="rounded-lg bg-surface-2 px-2.5 py-2 text-sm hover:bg-surface-2"
                   >
                     MAX
                   </button>
@@ -384,8 +384,8 @@ export default function Calculator() {
                     onClick={() => setTreasure(treasure === 2.5 ? 1 : 2.5)}
                     className={`ml-auto rounded-lg px-2.5 py-2 text-sm ${
                       treasure === 2.5
-                        ? "bg-amber-500/20 text-amber-300"
-                        : "bg-stone-800 text-stone-400"
+                        ? "bg-brand/20 text-brand"
+                        : "bg-surface-2 text-ink-dim"
                     }`}
                   >
                     お宝{treasure === 2.5 ? "フル ×2.5" : "なし ×1.0"}
@@ -397,10 +397,10 @@ export default function Calculator() {
 
           {/* 実質ステータス(ダメージ補正込み) — メイン表示 */}
           {(effective.length > 0 || strengthen || crit) && (
-            <section className="rounded-2xl border-2 border-emerald-500/50 bg-stone-900 p-4">
+            <section className="rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-emerald-500/[0.07] to-transparent p-4 shadow-lg shadow-emerald-500/10 ring-1 ring-inset ring-emerald-500/10">
               <h3 className="text-base font-bold text-emerald-400">
                 実質ステータス
-                <span className="ml-2 text-xs font-normal text-stone-400">
+                <span className="ml-2 text-xs font-normal text-ink-dim">
                   対象への補正込み / Lv{level}
                   {plus > 0 && `+${plus}`}
                 </span>
@@ -409,31 +409,31 @@ export default function Calculator() {
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-xs text-stone-400">
+                      <tr className="text-xs text-ink-dim">
                         <th className="py-1 text-left font-normal">対象</th>
-                        <th className="py-1 text-right font-normal">実質攻撃力</th>
-                        <th className="py-1 text-right font-normal">実質DPS</th>
-                        <th className="py-1 text-right font-normal">実質体力</th>
+                        <th className="py-1 pl-4 text-right font-normal">実質攻撃力</th>
+                        <th className="py-1 pl-4 text-right font-normal">実質DPS</th>
+                        <th className="py-1 pl-4 text-right font-normal">実質体力</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-stone-800">
+                    <tbody className="divide-y divide-line">
                       {effective.map((r) => (
                         <tr key={r.label}>
                           <td className="py-1.5 pr-2">
                             {r.label}
-                            <span className="ml-1 text-xs text-stone-500">
+                            <span className="ml-1 text-xs text-ink-dim">
                               {r.atkMult !== 1 && `攻×${r.atkMult}`}
                               {r.atkMult !== 1 && r.hpMult !== 1 && " "}
                               {r.hpMult !== 1 && `耐×${r.hpMult.toFixed(2).replace(/\.?0+$/, "")}`}
                             </span>
                           </td>
-                          <td className="py-1.5 text-right text-base font-bold tabular-nums text-emerald-300">
+                          <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-emerald-300">
                             {r.atk.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right tabular-nums">
+                          <td className="py-1.5 pl-4 text-right tabular-nums">
                             {r.dps.toLocaleString()}
                           </td>
-                          <td className="py-1.5 text-right text-base font-bold tabular-nums text-emerald-300">
+                          <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-emerald-300">
                             {r.hp.toLocaleString()}
                           </td>
                         </tr>
@@ -443,12 +443,12 @@ export default function Calculator() {
                 </div>
               )}
               {(strengthen || crit) && (
-                <ul className="mt-3 space-y-1 text-xs text-stone-300">
+                <ul className="mt-3 space-y-1 text-xs text-ink">
                   {strengthen && result && (
                     <li>
                       ・攻撃力上昇: 体力{strengthen.threshold}%以下で攻撃力 ×
                       {strengthen.mult.toFixed(2)}(発動時 攻撃力{" "}
-                      <span className="font-bold text-amber-300">
+                      <span className="font-bold text-brand">
                         {Math.round(result.atk * strengthen.mult).toLocaleString()}
                       </span>
                       )
@@ -458,7 +458,7 @@ export default function Calculator() {
                     <li>
                       ・クリティカル: {crit.prob}%で2倍 → 期待DPS ×
                       {crit.expectedMult.toFixed(2)}(
-                      <span className="font-bold text-amber-300">
+                      <span className="font-bold text-brand">
                         {Math.round(result.dps * crit.expectedMult).toLocaleString()}
                       </span>
                       )
@@ -466,7 +466,7 @@ export default function Calculator() {
                   )}
                 </ul>
               )}
-              <p className="mt-2 text-[11px] text-stone-500">
+              <p className="mt-2 text-[11px] text-ink-dim">
                 ※ベース値=本能・コンボ込みの攻撃力/体力/DPS。対象に該当する敵にのみ補正が乗ります。
                 {treasure > 1
                   ? "未来編お宝コンプ相当で、赤/浮/黒/天使/エイリアン/ゾンビ/メタルへの超ダメージは4倍に強化済み(古代/無属性/悪魔は対象外で3倍)。"
@@ -477,14 +477,14 @@ export default function Calculator() {
           )}
 
           {/* 基礎ステータス・詳細 */}
-          <section className="rounded-2xl border border-amber-500/30 bg-stone-900 p-4">
-            <h3 className="text-sm font-bold text-amber-400">
+          <section className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-black/20">
+            <h3 className="text-sm font-bold text-brand">
               基礎ステータス — Lv{level}
               {plus > 0 && `+${plus}`}
             </h3>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-stone-950 p-3">
-                <p className="text-xs text-stone-400">体力</p>
+              <div className="rounded-xl bg-sunken p-3">
+                <p className="text-xs text-ink-dim">体力</p>
                 <p className="text-2xl font-bold tabular-nums">{result.hp.toLocaleString()}</p>
                 {(result.hpTalentPct > 0 || result.hpComboPct > 0) && (
                   <p className="text-xs text-emerald-400">
@@ -494,11 +494,11 @@ export default function Calculator() {
                   </p>
                 )}
               </div>
-              <div className="rounded-xl bg-stone-950 p-3">
-                <p className="text-xs text-stone-400">攻撃力 (合計)</p>
+              <div className="rounded-xl bg-sunken p-3">
+                <p className="text-xs text-ink-dim">攻撃力 (合計)</p>
                 <p className="text-2xl font-bold tabular-nums">{result.atk.toLocaleString()}</p>
                 {result.atkHits.length > 1 && (
-                  <p className="text-xs text-stone-400">
+                  <p className="text-xs text-ink-dim">
                     {result.atkHits.map((a) => a.toLocaleString()).join(" + ")}
                   </p>
                 )}
@@ -510,20 +510,20 @@ export default function Calculator() {
                   </p>
                 )}
               </div>
-              <div className="rounded-xl bg-stone-950 p-3">
-                <p className="text-xs text-stone-400">DPS</p>
+              <div className="rounded-xl bg-sunken p-3">
+                <p className="text-xs text-ink-dim">DPS</p>
                 <p className="text-2xl font-bold tabular-nums">
                   {Math.round(result.dps).toLocaleString()}
                 </p>
                 {result.freqIsEstimate && (
-                  <p className="text-xs text-stone-500">※攻撃頻度は近似値</p>
+                  <p className="text-xs text-ink-dim">※攻撃頻度は近似値</p>
                 )}
               </div>
-              <div className="rounded-xl bg-stone-950 p-3">
-                <p className="text-xs text-stone-400">攻撃頻度</p>
+              <div className="rounded-xl bg-sunken p-3">
+                <p className="text-xs text-ink-dim">攻撃頻度</p>
                 <p className="text-2xl font-bold tabular-nums">
                   {framesToSec(result.freq)}
-                  <span className="text-sm font-normal text-stone-400">
+                  <span className="text-sm font-normal text-ink-dim">
                     秒 ({result.freq}F)
                   </span>
                 </p>
@@ -531,7 +531,7 @@ export default function Calculator() {
             </div>
 
             <table className="mt-3 w-full text-sm">
-              <tbody className="divide-y divide-stone-800">
+              <tbody className="divide-y divide-line">
                 {(
                   [
                     ["射程", String(result.range)],
@@ -548,7 +548,7 @@ export default function Calculator() {
                   ] as [string, string][]
                 ).map(([k, v]) => (
                   <tr key={k}>
-                    <td className="py-1.5 pr-2 text-stone-400">{k}</td>
+                    <td className="py-1.5 pr-2 text-ink-dim">{k}</td>
                     <td className="py-1.5 text-right tabular-nums">{v}</td>
                   </tr>
                 ))}
@@ -556,13 +556,13 @@ export default function Calculator() {
             </table>
 
             {targetTraits(form).length > 0 && (
-              <p className="mt-2 text-xs text-stone-300">
-                <span className="text-stone-500">対象: </span>
+              <p className="mt-2 text-xs text-ink">
+                <span className="text-ink-dim">対象: </span>
                 {targetTraits(form).join("・")}
               </p>
             )}
             {abilityTexts(form).length > 0 && (
-              <ul className="mt-2 space-y-1 text-xs text-stone-300">
+              <ul className="mt-2 space-y-1 text-xs text-ink">
                 {abilityTexts(form).map((t) => (
                   <li key={t}>・{t}</li>
                 ))}
@@ -572,19 +572,19 @@ export default function Calculator() {
 
           {/* 本能 */}
           {cat.talents && (
-            <section className="rounded-2xl border border-stone-800 bg-stone-900 p-4">
+            <section className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-black/20">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold">本能</h3>
                 <div className="flex gap-1.5">
                   <button
                     onClick={() => setTalentLv(cat.talents!.map((t) => t.maxLv))}
-                    className="rounded-lg bg-stone-800 px-2.5 py-1 text-xs hover:bg-stone-700"
+                    className="rounded-lg bg-surface-2 px-2.5 py-1 text-xs hover:bg-surface-2"
                   >
                     全てMAX
                   </button>
                   <button
                     onClick={() => setTalentLv(cat.talents!.map(() => 0))}
-                    className="rounded-lg bg-stone-800 px-2.5 py-1 text-xs hover:bg-stone-700"
+                    className="rounded-lg bg-surface-2 px-2.5 py-1 text-xs hover:bg-surface-2"
                   >
                     全て0
                   </button>
@@ -602,7 +602,7 @@ export default function Calculator() {
                           <span className="rounded bg-fuchsia-600 px-1 text-[10px]">超</span>
                         )}
                         <span>{talentLabel(t.abilityId, t.textId, meta)}</span>
-                        <span className="ml-auto tabular-nums text-stone-400">
+                        <span className="ml-auto tabular-nums text-ink-dim">
                           Lv{lv}/{t.maxLv}
                           {vMax !== 0 && (
                             <span className={lv > 0 ? "ml-2 text-emerald-400" : "ml-2"}>
@@ -628,7 +628,7 @@ export default function Calculator() {
                           next[i] = Number(e.target.value);
                           setTalentLv(next);
                         }}
-                        className="mt-1 w-full accent-amber-500"
+                        className="mt-1 w-full accent-brand"
                       />
                     </div>
                   );
@@ -638,13 +638,13 @@ export default function Calculator() {
           )}
 
           {/* にゃんコンボ */}
-          <section className="rounded-2xl border border-stone-800 bg-stone-900 p-4">
+          <section className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-black/20">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold">にゃんコンボ</h3>
               {comboIds.length > 0 && (
                 <button
                   onClick={() => setComboIds([])}
-                  className="rounded-lg bg-stone-800 px-2.5 py-1 text-xs hover:bg-stone-700"
+                  className="rounded-lg bg-surface-2 px-2.5 py-1 text-xs hover:bg-surface-2"
                 >
                   全て解除
                 </button>
@@ -656,7 +656,7 @@ export default function Calculator() {
                   <button
                     key={c.id}
                     onClick={() => setComboIds(comboIds.filter((id) => id !== c.id))}
-                    className="rounded-full bg-amber-500/20 px-3 py-1 text-xs text-amber-300"
+                    className="rounded-full bg-brand/20 px-3 py-1 text-xs text-brand"
                   >
                     {c.name} ({comboEffectText(c, meta)}) ✕
                   </button>
@@ -668,7 +668,7 @@ export default function Calculator() {
               onChange={(e) => setComboQuery(e.target.value)}
               onFocus={() => setComboOpen(true)}
               placeholder="コンボ名・効果で検索 (例: 攻撃力アップ)"
-              className="mt-2 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2 text-sm outline-none focus:border-amber-500"
+              className="mt-2 w-full rounded-lg border border-line bg-sunken px-3 py-2 text-sm outline-none focus:border-brand"
             />
             {comboOpen && (
               <>
@@ -688,17 +688,17 @@ export default function Calculator() {
                           }
                           className={`w-full rounded-lg px-3 py-2 text-left text-xs ${
                             active
-                              ? "bg-amber-500/15 ring-1 ring-amber-500/50"
-                              : "bg-stone-950 hover:bg-stone-800"
+                              ? "bg-brand/15 ring-1 ring-brand/50"
+                              : "bg-sunken hover:bg-surface-2"
                           }`}
                         >
                           <div className="flex flex-wrap items-center gap-x-2">
                             <span className="font-bold">{c.name}</span>
-                            <span className={statCombo ? "text-emerald-400" : "text-stone-400"}>
+                            <span className={statCombo ? "text-emerald-400" : "text-ink-dim"}>
                               {comboEffectText(c, meta)}
                             </span>
                           </div>
-                          <p className="mt-0.5 text-stone-500">
+                          <p className="mt-0.5 text-ink-dim">
                             {c.units.map(([id, f]) => unitName(id, f)).join(" / ")}
                           </p>
                         </button>
@@ -706,7 +706,7 @@ export default function Calculator() {
                     );
                   })}
                 </ul>
-                <p className="mt-2 text-[11px] text-stone-500">
+                <p className="mt-2 text-[11px] text-ink-dim">
                   ※ステータスに反映されるのは「攻撃力/体力/移動速度アップ」系。その他のコンボは選択しても数値には反映されません。
                 </p>
               </>

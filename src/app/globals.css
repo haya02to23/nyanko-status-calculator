@@ -1,18 +1,75 @@
 @import "tailwindcss";
 
-/* ダークテーマ固定 */
-:root {
-  --background: #0c0a09; /* stone-950 */
-  --foreground: #f5f5f4; /* stone-100 */
+/* ── デザイントークン(ダークUI: 純黒回避・サーフェス階層・絞ったアクセント) ── */
+@theme {
+  --color-bg: #0c0c11; /* ベース背景(わずかに青みのある黒) */
+  --color-surface: #16161e; /* カード */
+  --color-surface-2: #20202b; /* カード内のボタン等(浮き) */
+  --color-sunken: #0f0f15; /* 入力欄・小パネル(沈み) */
+  --color-line: #2b2b38; /* 罫線・境界 */
+  --color-ink: #ededf2; /* 本文(オフホワイト) */
+  --color-ink-dim: #9b9bab; /* 補助テキスト */
+  --color-brand: #f5b740; /* アクセント(にゃんこ=暖色イエロー) */
+  --color-real: #34d399; /* 実質値アクセント(エメラルド) */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+:root {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", Arial, sans-serif;
+  background-color: var(--color-bg);
+  /* 上部にごく淡いグロー。固定でなくスクロール追従(軽量) */
+  background-image:
+    radial-gradient(900px 460px at 50% -8%, rgba(245, 183, 64, 0.07), transparent 60%),
+    radial-gradient(700px 420px at 100% 4%, rgba(52, 211, 153, 0.05), transparent 55%);
+  background-repeat: no-repeat;
+  color: var(--color-ink);
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
+    "Noto Sans JP", -apple-system, system-ui, sans-serif;
+  font-feature-settings: "palt" 1; /* 日本語の詰めを少しタイトに */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(245, 183, 64, 0.28);
+}
+
+/* 細めのスクロールバー */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 9999px;
+}
+
+/* 数値が動いても幅がブレないように(共通) */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ボタン・入力・リンクのホバーを軽く滑らかに(軽量) */
+button,
+input,
+a,
+[role="button"] {
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+/* 数値の見出しは少しだけ字間を締める */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.01em;
 }
