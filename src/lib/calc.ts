@@ -100,14 +100,16 @@ export function calcStats(cat: Cat, form: CatForm, opt: CalcOptions): CalcResult
     });
   }
 
-  // にゃんコンボ(同効果は加算)
+  // にゃんコンボ(同効果は加算)。1コンボが複数効果を持つ場合あり
   let hpComboPct = 0;
   let atkComboPct = 0;
   let speedComboPct = 0;
   for (const c of opt.combos) {
-    if (c.effect === COMBO_HP_UP) hpComboPct += c.value;
-    else if (c.effect === COMBO_ATK_UP) atkComboPct += c.value;
-    else if (c.effect === COMBO_SPEED_UP) speedComboPct += c.value;
+    for (const e of c.effects) {
+      if (e.effect === COMBO_HP_UP) hpComboPct += e.value;
+      else if (e.effect === COMBO_ATK_UP) atkComboPct += e.value;
+      else if (e.effect === COMBO_SPEED_UP) speedComboPct += e.value;
+    }
   }
 
   const hpBase = applyLevel(form.hp, multPct, opt.treasure);

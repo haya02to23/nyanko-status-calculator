@@ -120,13 +120,17 @@ export type Cat = {
   talents: Talent[] | null;
 };
 
-export type Combo = {
-  id: number;
-  name: string;
+export type ComboEffect = {
   effect: number;
   size: number;
   value: number;
+};
+
+export type Combo = {
+  id: number;
+  name: string;
   units: [number, number][];
+  effects: ComboEffect[];
 };
 
 export type Meta = {

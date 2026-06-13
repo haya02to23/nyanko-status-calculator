@@ -33,6 +33,21 @@ const RARITY_COLORS = [
   "bg-rose-600",
 ];
 
+const STAT_EFFECTS = [COMBO_ATK_UP, COMBO_HP_UP, COMBO_SPEED_UP];
+const comboHasStat = (c: Combo) => c.effects.some((e) => STAT_EFFECTS.includes(e.effect));
+
+// コンボの効果を「攻撃力アップ【大】+20%」のように整形(全効果)
+function comboEffectText(c: Combo, meta: Meta): string {
+  return c.effects
+    .map((e) => {
+      const name = meta.comboEffects[e.effect] ?? "";
+      const size = meta.comboSizes[e.size] ?? "";
+      const pct = STAT_EFFECTS.includes(e.effect) ? ` +${e.value}%` : "";
+      return `${name}${size}${pct}`;
+    })
+    .join(" / ");
+}
+
 const TALENT_LABELS: Record<number, string> = {
   [TALENT_HP_UP]: "体力アップ",
   [TALENT_ATK_UP]: "攻撃力アップ",
@@ -138,15 +153,15 @@ export default function Calculator() {
     if (!combosAll || !meta) return [];
     const q = norm(comboQuery.trim());
     const statFirst = [...combosAll].sort((a, b) => {
-      const sa = [COMBO_ATK_UP, COMBO_HP_UP, COMBO_SPEED_UP].includes(a.effect) ? 0 : 1;
-      const sb = [COMBO_ATK_UP, COMBO_HP_UP, COMBO_SPEED_UP].includes(b.effect) ? 0 : 1;
-      return sa - sb || a.effect - b.effect || b.value - a.value;
+      const sa = comboHasStat(a) ? 0 : 1;
+      const sb = comboHasStat(b) ? 0 : 1;
+      return sa - sb || a.effects[0].effect - b.effects[0].effect;
     });
     return statFirst.filter((c) => {
       if (!q) return true;
       return (
         norm(c.name).includes(q) ||
-        norm(meta.comboEffects[c.effect] ?? "").includes(q)
+        c.effects.some((e) => norm(meta.comboEffects[e.effect] ?? "").includes(q))
       );
     });
   }, [combosAll, meta, comboQuery]);
@@ -481,8 +496,7 @@ export default function Calculator() {
                     onClick={() => setComboIds(comboIds.filter((id) => id !== c.id))}
                     className="rounded-full bg-amber-500/20 px-3 py-1 text-xs text-amber-300"
                   >
-                    {c.name} ({meta.comboEffects[c.effect]}
-                    {meta.comboSizes[c.size]}) ✕
+                    {c.name} ({comboEffectText(c, meta)}) ✕
                   </button>
                 ))}
               </div>
@@ -499,9 +513,7 @@ export default function Calculator() {
                 <ul className="mt-2 max-h-72 space-y-1 overflow-auto">
                   {comboResults.slice(0, 60).map((c) => {
                     const active = comboIds.includes(c.id);
-                    const statCombo = [COMBO_ATK_UP, COMBO_HP_UP, COMBO_SPEED_UP].includes(
-                      c.effect
-                    );
+                    const statCombo = comboHasStat(c);
                     return (
                       <li key={c.id}>
                         <button
@@ -518,12 +530,10 @@ export default function Calculator() {
                               : "bg-stone-950 hover:bg-stone-800"
                           }`}
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-x-2">
                             <span className="font-bold">{c.name}</span>
                             <span className={statCombo ? "text-emerald-400" : "text-stone-400"}>
-                              {meta.comboEffects[c.effect]}
-                              {meta.comboSizes[c.size]}
-                              {statCombo && ` +${c.value}%`}
+                              {comboEffectText(c, meta)}
                             </span>
                           </div>
                           <p className="mt-0.5 text-stone-500">

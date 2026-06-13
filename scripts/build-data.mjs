@@ -22,6 +22,16 @@ const num = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+// ---- battlecatsinfo cat.tsv: 実装済み形態数(未実装の第3/第4形態を除外) ----
+const formCount = []; // catId -> 実装形態数
+{
+  const lines = readFileSync(join(RAW, "bci_cat.tsv"), "utf8").split(/\r?\n/).slice(1);
+  lines.forEach((line, id) => {
+    if (!line.trim()) return;
+    formCount[id] = num(line.split("\t")[1]) || 0;
+  });
+}
+
 // ---- battlecatsinfo catstat.tsv: backswing と攻撃頻度(アニメ込み)を補完 ----
 const bci = new Map(); // id -> [form rows]
 {
@@ -88,7 +98,9 @@ for (let id = 0; ; id++) {
     .map((l) => l.split(","));
   const buy = unitbuy[id] ?? [];
   const growth = (unitlevel[id] ?? []).map(num);
-  const nForms = Math.min(statRows.length, nameRows.length);
+  // 実装済み形態数で制限(未実装の第3/第4形態はデータに存在するが除外)
+  const realForms = formCount[id] || statRows.length;
+  const nForms = Math.min(statRows.length, nameRows.length, realForms);
   const forms = [];
   for (let f = 0; f < nForms; f++) {
     const c = statRows[f].map(num);
@@ -174,27 +186,31 @@ const sizeNames = readFileSync(join(RAW, "jp/resLocal/Nyancombo2_ja.csv"), "utf8
 const comboParams = readFileSync(join(RAW, "jp/DataLocal/NyancomboParam.tsv"), "utf8")
   .split(/\r?\n/).filter((l) => l.trim()).map((l) => l.split("\t").map(num));
 
-const combos = [];
+// NyancomboData.csv は「1行=1効果」。先頭列がコンボID で、1つのコンボが
+// 複数行(複数効果)にまたがる場合がある(例: にゃんこ軍団=効果5+効果4)。
+// コンボID単位でまとめ、effects 配列に全効果を持たせる。
+const comboMap = new Map(); // comboId -> combo
 for (const row of readCsv(join(RAW, "jp/DataLocal/NyancomboData.csv"))) {
   const c = row.map(num);
   const comboId = c[0];
   const effect = c[13];
   const size = c[14];
   if (effect < 0 || !comboNames[comboId]) continue;
-  const units = [];
-  for (let i = 3; i <= 11; i += 2) {
-    if (c[i] >= 0) units.push([c[i], c[i + 1]]);
+  if (!comboMap.has(comboId)) {
+    const units = [];
+    for (let i = 3; i <= 11; i += 2) {
+      if (c[i] >= 0) units.push([c[i], c[i + 1]]);
+    }
+    if (!units.length) continue;
+    comboMap.set(comboId, { id: comboId, name: comboNames[comboId], units, effects: [] });
   }
-  if (!units.length) continue;
-  combos.push({
-    id: comboId,
-    name: comboNames[comboId],
+  comboMap.get(comboId).effects.push({
     effect,
     size,
     value: comboParams[effect]?.[size] ?? 0,
-    units,
   });
 }
+const combos = [...comboMap.values()];
 
 const meta = {
   rarities: ["基本", "EX", "レア", "激レア", "超激レア", "伝説レア"],
