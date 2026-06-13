@@ -142,7 +142,7 @@ for (let id = 0; ; id++) {
         survive: c[42], crit: c[31], attacksOnly: c[32] === 1,
         extraMoney: c[33] === 1, baseDestroyer: c[34] === 1,
         waveProb: c[35], waveLevel: c[36], waveMini: c[94] === 1,
-        zombieKiller: c[52] === 1, witchKiller: c[53] === 1,
+        zombieKiller: c[52] === 1, witchKiller: c[53] === 1, evaKiller: c[77] === 1,
         barrierBreak: c[70], shieldPierce: c[95],
         warpProb: c[71], warpDur: c[72],
         savageProb: c[82], savageAdd: c[83], dodgeProb: c[84], dodgeDur: c[85],

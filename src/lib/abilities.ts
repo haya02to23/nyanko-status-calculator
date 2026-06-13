@@ -26,11 +26,11 @@ export function abilityTexts(form: CatForm): string[] {
   const out: string[] = [];
   const sec = (f: number) => `${framesToSec(f)}秒`;
 
-  if (a.strong) out.push("めっぽう強い (与ダメ×1.5 / 被ダメ×0.5)");
-  if (a.massive) out.push("超ダメージ (与ダメ×3)");
-  if (a.insaneDamage) out.push("極ダメージ (与ダメ×5)");
-  if (a.resistant) out.push("打たれ強い (被ダメ×0.25)");
-  if (a.insanelyTough) out.push("超打たれ強い (被ダメ×0.16)");
+  if (a.strong) out.push("めっぽう強い (対象に 攻×1.5 / 実質体力×2)");
+  if (a.massive) out.push("超ダメージ (対象に 攻×3)");
+  if (a.insaneDamage) out.push("極ダメージ (対象に 攻×5)");
+  if (a.resistant) out.push("打たれ強い (対象から 実質体力×4)");
+  if (a.insanelyTough) out.push("超打たれ強い (対象から 実質体力×6)");
   if (a.kbProb > 0) out.push(`ふっとばす (${a.kbProb}%)`);
   if (a.freezeProb > 0) out.push(`動きを止める (${a.freezeProb}% / ${sec(a.freezeDur)})`);
   if (a.slowProb > 0) out.push(`動きを遅くする (${a.slowProb}% / ${sec(a.slowDur)})`);
@@ -56,11 +56,12 @@ export function abilityTexts(form: CatForm): string[] {
   if (a.dodgeProb > 0) out.push(`攻撃無効 (${a.dodgeProb}% / ${sec(a.dodgeDur)})`);
   if (a.behemothDodgeProb > 0)
     out.push(`超獣の攻撃無効 (${a.behemothDodgeProb}% / ${sec(a.behemothDodgeDur)})`);
-  if (a.zombieKiller) out.push("ゾンビキラー");
-  if (a.witchKiller) out.push("魔女キラー");
-  if (a.colossusSlayer) out.push("超生命体特効");
-  if (a.behemothSlayer) out.push("超獣特効");
-  if (a.sageSlayer) out.push("超賢者特効");
+  if (a.zombieKiller) out.push("ゾンビキラー (復活を阻止)");
+  if (a.witchKiller) out.push("魔女キラー (魔女に 攻×5 / 実質体力×10)");
+  if (a.evaKiller) out.push("使徒キラー (使徒に 攻×5 / 実質体力×5)");
+  if (a.colossusSlayer) out.push("超生命体特効 (攻×1.6 / 実質体力×1.43)");
+  if (a.behemothSlayer) out.push("超獣特効 (攻×2.5 / 実質体力×1.67)");
+  if (a.sageSlayer) out.push("超賢者特効 (攻×1.2 / 実質体力×2)");
   if (a.metalKiller) out.push("メタルキラー");
   if (a.soulStrike) out.push("魂攻撃");
   if (a.baseDestroyer) out.push("城破壊ホーダイ");

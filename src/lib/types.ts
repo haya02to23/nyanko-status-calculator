@@ -26,6 +26,7 @@ export type FormAbilities = {
   waveMini: boolean;
   zombieKiller: boolean;
   witchKiller: boolean;
+  evaKiller: boolean;
   barrierBreak: number;
   shieldPierce: number;
   warpProb: number;
