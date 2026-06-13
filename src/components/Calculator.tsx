@@ -35,6 +35,12 @@ const RARITY_COLORS = [
   "bg-rose-600",
 ];
 
+const HISTORY_KEY = "nyanko-calc-history";
+
+// 形態に応じた既定レベル: 第4形態(超化)はLv60で解放されるため60スタート
+const defaultLevelForForm = (formIdx: number, maxBase: number) =>
+  Math.min(formIdx >= 3 ? 60 : 50, maxBase);
+
 const STAT_EFFECTS = [COMBO_ATK_UP, COMBO_HP_UP, COMBO_SPEED_UP];
 const comboHasStat = (c: Combo) => c.effects.some((e) => STAT_EFFECTS.includes(e.effect));
 
@@ -86,6 +92,7 @@ export default function Calculator() {
   const [comboIds, setComboIds] = useState<number[]>([]);
   const [comboQuery, setComboQuery] = useState("");
   const [comboOpen, setComboOpen] = useState(false);
+  const [history, setHistory] = useState<number[]>([]);
 
   useEffect(() => {
     Promise.all(
@@ -102,6 +109,13 @@ export default function Calculator() {
         setMeta(m);
       })
       .catch(() => setLoadError(true));
+    // 検索履歴をlocalStorageから復元
+    try {
+      const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
+      if (Array.isArray(saved)) setHistory(saved.filter((x) => typeof x === "number").slice(0, 8));
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const cat = useMemo(
@@ -124,18 +138,43 @@ export default function Calculator() {
 
   const selectCat = (c: Cat) => {
     setSelId(c.id);
-    setFormIdx(c.forms.length - 1);
+    const lastIdx = c.forms.length - 1;
+    setFormIdx(lastIdx);
     const maxBase = c.maxBase || 50;
-    setLevel(Math.min(50, maxBase));
+    setLevel(defaultLevelForForm(lastIdx, maxBase));
     setPlus(0);
     setTalentLv(c.talents ? c.talents.map((t) => t.maxLv) : []);
     setQuery("");
+    // 検索履歴を更新(先頭に追加・重複除去・最大8件)
+    setHistory((prev) => {
+      const next = [c.id, ...prev.filter((id) => id !== c.id)].slice(0, 8);
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  // 形態を切り替える。第4形態に切替時はLv60未満ならLv60へ引き上げる
+  const selectForm = (idx: number) => {
+    setFormIdx(idx);
+    if (idx >= 3) setLevel((lv) => Math.max(lv, Math.min(60, maxBase)));
   };
 
   const selectedCombos = useMemo(
     () => (combosAll ? combosAll.filter((c) => comboIds.includes(c.id)) : []),
     [combosAll, comboIds]
   );
+
+  // 検索履歴(localStorageのid配列)を実体に解決
+  const historyCats = useMemo(() => {
+    if (!cats) return [];
+    return history
+      .map((id) => cats.find((c) => c.id === id))
+      .filter((c): c is Cat => !!c);
+  }, [cats, history]);
 
   const result = useMemo(() => {
     if (!cat || !form) return null;
@@ -232,12 +271,33 @@ export default function Calculator() {
       </div>
 
       {!cat && (
-        <div className="mt-16 text-center text-stone-400">
+        <div className="mt-10 text-center text-stone-400">
           <p className="text-5xl">🐱</p>
           <p className="mt-4">キャラ名を検索して選択してください</p>
           <p className="mt-2 text-sm text-stone-500">
-            レベル・本能・にゃんコンボを反映したステータスを自動計算します
+            レベル・本能・にゃんコンボ・ダメージ補正込みの実質ステータスを計算します
           </p>
+          {historyCats.length > 0 && (
+            <div className="mx-auto mt-8 max-w-md text-left">
+              <p className="mb-2 text-xs text-stone-500">最近見たキャラ</p>
+              <div className="flex flex-wrap gap-1.5">
+                {historyCats.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => selectCat(c)}
+                    className="flex items-center gap-1.5 rounded-full border border-stone-700 bg-stone-900 px-3 py-1.5 text-sm hover:border-amber-500"
+                  >
+                    <span
+                      className={`rounded px-1 py-0.5 text-[10px] text-white ${RARITY_COLORS[c.rarity]}`}
+                    >
+                      {meta.rarities[c.rarity]}
+                    </span>
+                    <span>{c.forms[c.forms.length - 1].name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -259,7 +319,7 @@ export default function Calculator() {
               {cat.forms.map((f, i) => (
                 <button
                   key={i}
-                  onClick={() => setFormIdx(i)}
+                  onClick={() => selectForm(i)}
                   className={`rounded-lg px-3 py-1.5 text-sm ${
                     i === formIdx
                       ? "bg-amber-500 font-bold text-stone-950"
@@ -302,7 +362,7 @@ export default function Calculator() {
               <div className="col-span-2">
                 <span className="text-xs text-stone-400">クイック設定 / 日本編お宝</span>
                 <div className="mt-1 flex gap-1.5">
-                  {[30, 50].map((lv) => (
+                  {[30, 50, ...(maxBase >= 60 ? [60] : [])].map((lv) => (
                     <button
                       key={lv}
                       onClick={() => setLevel(Math.min(lv, maxBase))}
@@ -335,10 +395,91 @@ export default function Calculator() {
             </div>
           </section>
 
-          {/* 計算結果 */}
+          {/* 実質ステータス(ダメージ補正込み) — メイン表示 */}
+          {(effective.length > 0 || strengthen || crit) && (
+            <section className="rounded-2xl border-2 border-emerald-500/50 bg-stone-900 p-4">
+              <h3 className="text-base font-bold text-emerald-400">
+                実質ステータス
+                <span className="ml-2 text-xs font-normal text-stone-400">
+                  対象への補正込み / Lv{level}
+                  {plus > 0 && `+${plus}`}
+                </span>
+              </h3>
+              {effective.length > 0 && (
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-stone-400">
+                        <th className="py-1 text-left font-normal">対象</th>
+                        <th className="py-1 text-right font-normal">実質攻撃力</th>
+                        <th className="py-1 text-right font-normal">実質DPS</th>
+                        <th className="py-1 text-right font-normal">実質体力</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-800">
+                      {effective.map((r) => (
+                        <tr key={r.label}>
+                          <td className="py-1.5 pr-2">
+                            {r.label}
+                            <span className="ml-1 text-xs text-stone-500">
+                              {r.atkMult !== 1 && `攻×${r.atkMult}`}
+                              {r.atkMult !== 1 && r.hpMult !== 1 && " "}
+                              {r.hpMult !== 1 && `耐×${r.hpMult.toFixed(2).replace(/\.?0+$/, "")}`}
+                            </span>
+                          </td>
+                          <td className="py-1.5 text-right text-base font-bold tabular-nums text-emerald-300">
+                            {r.atk.toLocaleString()}
+                          </td>
+                          <td className="py-1.5 text-right tabular-nums">
+                            {r.dps.toLocaleString()}
+                          </td>
+                          <td className="py-1.5 text-right text-base font-bold tabular-nums text-emerald-300">
+                            {r.hp.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {(strengthen || crit) && (
+                <ul className="mt-3 space-y-1 text-xs text-stone-300">
+                  {strengthen && result && (
+                    <li>
+                      ・攻撃力上昇: 体力{strengthen.threshold}%以下で攻撃力 ×
+                      {strengthen.mult.toFixed(2)}(発動時 攻撃力{" "}
+                      <span className="font-bold text-amber-300">
+                        {Math.round(result.atk * strengthen.mult).toLocaleString()}
+                      </span>
+                      )
+                    </li>
+                  )}
+                  {crit && result && (
+                    <li>
+                      ・クリティカル: {crit.prob}%で2倍 → 期待DPS ×
+                      {crit.expectedMult.toFixed(2)}(
+                      <span className="font-bold text-amber-300">
+                        {Math.round(result.dps * crit.expectedMult).toLocaleString()}
+                      </span>
+                      )
+                    </li>
+                  )}
+                </ul>
+              )}
+              <p className="mt-2 text-[11px] text-stone-500">
+                ※ベース値=本能・コンボ込みの攻撃力/体力/DPS。対象に該当する敵にのみ補正が乗ります。
+                {treasure > 1
+                  ? "未来編お宝コンプ相当で、赤/浮/黒/天使/エイリアン/ゾンビ/メタルへの超ダメージは4倍に強化済み(古代/無属性/悪魔は対象外で3倍)。"
+                  : "お宝なし設定のため対属性強化なし(超ダメージ3倍)。"}
+                本能による倍率強化(超本能の超ダメ強化等)は未反映。
+              </p>
+            </section>
+          )}
+
+          {/* 基礎ステータス・詳細 */}
           <section className="rounded-2xl border border-amber-500/30 bg-stone-900 p-4">
             <h3 className="text-sm font-bold text-amber-400">
-              計算結果 — Lv{level}
+              基礎ステータス — Lv{level}
               {plus > 0 && `+${plus}`}
             </h3>
             <div className="mt-3 grid grid-cols-2 gap-3">
@@ -428,83 +569,6 @@ export default function Calculator() {
               </ul>
             )}
           </section>
-
-          {/* 実質ステータス(ダメージ補正込み) */}
-          {(effective.length > 0 || strengthen || crit) && (
-            <section className="rounded-2xl border border-emerald-500/30 bg-stone-900 p-4">
-              <h3 className="text-sm font-bold text-emerald-400">
-                実質ステータス(対象への補正込み)
-              </h3>
-              {effective.length > 0 && (
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-xs text-stone-400">
-                        <th className="py-1 text-left font-normal">対象</th>
-                        <th className="py-1 text-right font-normal">実質攻撃力</th>
-                        <th className="py-1 text-right font-normal">実質DPS</th>
-                        <th className="py-1 text-right font-normal">実質体力</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-800">
-                      {effective.map((r) => (
-                        <tr key={r.label}>
-                          <td className="py-1.5 pr-2">
-                            {r.label}
-                            <span className="ml-1 text-xs text-stone-500">
-                              {r.atkMult !== 1 && `攻×${r.atkMult}`}
-                              {r.atkMult !== 1 && r.hpMult !== 1 && " "}
-                              {r.hpMult !== 1 && `耐×${r.hpMult.toFixed(2).replace(/\.?0+$/, "")}`}
-                            </span>
-                          </td>
-                          <td className="py-1.5 text-right font-bold tabular-nums text-emerald-300">
-                            {r.atk.toLocaleString()}
-                          </td>
-                          <td className="py-1.5 text-right tabular-nums">
-                            {r.dps.toLocaleString()}
-                          </td>
-                          <td className="py-1.5 text-right font-bold tabular-nums text-emerald-300">
-                            {r.hp.toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {(strengthen || crit) && (
-                <ul className="mt-3 space-y-1 text-xs text-stone-300">
-                  {strengthen && result && (
-                    <li>
-                      ・攻撃力上昇: 体力{strengthen.threshold}%以下で攻撃力 ×
-                      {strengthen.mult.toFixed(2)}(発動時 攻撃力{" "}
-                      <span className="font-bold text-amber-300">
-                        {Math.round(result.atk * strengthen.mult).toLocaleString()}
-                      </span>
-                      )
-                    </li>
-                  )}
-                  {crit && result && (
-                    <li>
-                      ・クリティカル: {crit.prob}%で2倍 → 期待DPS ×
-                      {crit.expectedMult.toFixed(2)}(
-                      <span className="font-bold text-amber-300">
-                        {Math.round(result.dps * crit.expectedMult).toLocaleString()}
-                      </span>
-                      )
-                    </li>
-                  )}
-                </ul>
-              )}
-              <p className="mt-2 text-[11px] text-stone-500">
-                ※ベース値=本能・コンボ込みの攻撃力/体力/DPS。対象に該当する敵にのみ補正が乗ります。
-                {treasure > 1
-                  ? "未来編お宝コンプ相当で、赤/浮/黒/天使/エイリアン/ゾンビ/メタルへの超ダメージは4倍に強化済み(古代/無属性/悪魔は対象外で3倍)。"
-                  : "お宝なし設定のため対属性強化なし(超ダメージ3倍)。"}
-                本能による倍率強化(超本能の超ダメ強化等)は未反映。
-              </p>
-            </section>
-          )}
 
           {/* 本能 */}
           {cat.talents && (
