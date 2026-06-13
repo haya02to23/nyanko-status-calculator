@@ -211,6 +211,7 @@ export default function Calculator() {
 
   const strengthen = resolved?.strengthen ?? null;
   const crit = resolved?.crit ?? null;
+  const savage = resolved?.savage ?? null;
 
   // 連続攻撃でヒットごとに射程が異なる場合の各ヒット射程帯
   const hitRanges = useMemo(() => (form ? activeHitRanges(form) : []), [form]);
@@ -406,7 +407,7 @@ export default function Calculator() {
           </section>
 
           {/* 実質ステータス(ダメージ補正込み) — メイン表示 */}
-          {(effective.length > 0 || strengthen || crit) && (
+          {(effective.length > 0 || strengthen || crit || savage) && (
             <section className="rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-emerald-500/[0.07] to-transparent p-4 shadow-lg shadow-emerald-500/10 ring-1 ring-inset ring-emerald-500/10">
               <h3 className="text-base font-bold text-emerald-400">
                 実質ステータス
@@ -452,9 +453,9 @@ export default function Calculator() {
                   </table>
                 </div>
               )}
-              {(strengthen || crit) && (
-                <ul className="mt-3 space-y-1 text-xs text-ink">
-                  {strengthen && result && (
+              {(strengthen || crit || savage) && result && (
+                <ul className="mt-3 space-y-1.5 text-xs text-ink">
+                  {strengthen && (
                     <li>
                       ・攻撃力上昇: 体力{strengthen.threshold}%以下で攻撃力 ×
                       {strengthen.mult.toFixed(2)}(発動時 攻撃力{" "}
@@ -464,12 +465,29 @@ export default function Calculator() {
                       )
                     </li>
                   )}
-                  {crit && result && (
+                  {crit && (
                     <li>
-                      ・クリティカル: {crit.prob}%で2倍 → 期待DPS ×
-                      {crit.expectedMult.toFixed(2)}(
+                      ・クリティカル: 発動率{crit.prob}% / 発動時 攻撃力{" "}
+                      <span className="font-bold text-brand">
+                        ×2 = {Math.round(result.atk * crit.hitMult).toLocaleString()}
+                      </span>{" "}
+                      / 期待DPS ×{crit.expectedMult.toFixed(2)}(
                       <span className="font-bold text-brand">
                         {Math.round(result.dps * crit.expectedMult).toLocaleString()}
+                      </span>
+                      )
+                    </li>
+                  )}
+                  {savage && (
+                    <li>
+                      ・渾身の一撃: 発動率{savage.prob}% / 威力+{savage.add}% / 発動時 攻撃力{" "}
+                      <span className="font-bold text-brand">
+                        ×{savage.hitMult.toFixed(2)} ={" "}
+                        {Math.round(result.atk * savage.hitMult).toLocaleString()}
+                      </span>{" "}
+                      / 期待DPS ×{savage.expectedMult.toFixed(2)}(
+                      <span className="font-bold text-brand">
+                        {Math.round(result.dps * savage.expectedMult).toLocaleString()}
                       </span>
                       )
                     </li>

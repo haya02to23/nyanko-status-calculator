@@ -312,12 +312,15 @@ const TALENT_TRAIT_ADD: Record<number, keyof CatForm["traits"]> = {
 };
 const TALENT_STRENGTHEN = 10; // 体力低下で攻撃力上昇
 const TALENT_CRIT = 13; // クリティカル
+const TALENT_SAVAGE = 50; // 渾身の一撃
 
 export type ResolvedForm = {
   traits: CatForm["traits"];
   ab: FormAbilities;
   strengthen: { threshold: number; mult: number } | null;
-  crit: { prob: number; expectedMult: number } | null;
+  // crit/savage: prob=発動率%, hitMult=発動時の攻撃倍率, expectedMult=期待値倍率
+  crit: { prob: number; hitMult: number; expectedMult: number } | null;
+  savage: { prob: number; add: number; hitMult: number; expectedMult: number } | null;
 };
 
 export function resolveTalents(
@@ -330,6 +333,8 @@ export function resolveTalents(
   let strengthenStart = form.ab.strengthenStart;
   let strengthenBoost = form.ab.strengthenBoost;
   let critProb = form.ab.crit;
+  let savageProb = form.ab.savageProb;
+  let savageAdd = form.ab.savageAdd;
 
   if (talents) {
     talents.forEach((t, i) => {
@@ -347,6 +352,11 @@ export function resolveTalents(
       if (t.abilityId === TALENT_CRIT) {
         critProb = Math.max(critProb, talentValue(t, lv, 0));
       }
+      if (t.abilityId === TALENT_SAVAGE) {
+        // slot0=発動率%(Lvで増加), slot1=威力追加%
+        savageProb = Math.max(savageProb, talentValue(t, lv, 0));
+        savageAdd = Math.max(savageAdd, talentValue(t, lv, 1));
+      }
     });
   }
 
@@ -357,6 +367,20 @@ export function resolveTalents(
       strengthenBoost > 0
         ? { threshold: strengthenStart, mult: 1 + strengthenBoost / 100 }
         : null,
-    crit: critProb > 0 ? { prob: critProb, expectedMult: 1 + critProb / 100 } : null,
+    // クリティカル: 発動時 攻撃力×2、期待倍率 1+prob/100
+    crit:
+      critProb > 0
+        ? { prob: critProb, hitMult: 2, expectedMult: 1 + critProb / 100 }
+        : null,
+    // 渾身の一撃: 発動時 ×(1+add/100)、期待倍率 1+add×prob/10000
+    savage:
+      savageAdd > 0 && savageProb > 0
+        ? {
+            prob: savageProb,
+            add: savageAdd,
+            hitMult: 1 + savageAdd / 100,
+            expectedMult: 1 + (savageAdd * savageProb) / 10000,
+          }
+        : null,
   };
 }
