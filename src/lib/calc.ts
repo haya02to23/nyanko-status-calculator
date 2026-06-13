@@ -1,4 +1,4 @@
-import type { Cat, CatForm, Combo, Talent } from "./types";
+import type { Cat, CatForm, Combo, FormAbilities, Talent } from "./types";
 
 // 本能のabilityIDのうち、表示ステータスに直接影響するもの
 export const TALENT_HP_UP = 32; // 基本体力アップ(%)
@@ -217,8 +217,9 @@ const ATTACK_TARGET_KEYS = [
 ] as const;
 
 // treasureBonus: 未来編お宝コンプ相当の対属性強化を適用するか
+// form は本能解決後の {traits, ab} を渡す(resolveTalents の結果でも CatForm でも可)
 export function effectiveRows(
-  form: CatForm,
+  form: { traits: CatForm["traits"]; ab: FormAbilities },
   base: EffectiveBase,
   treasureBonus: boolean
 ): EffectiveRow[] {
@@ -279,16 +280,81 @@ export function effectiveRows(
   return rows;
 }
 
-// 攻撃力上昇(体力一定%以下で発動): 発動時の追加倍率。未所持は null
-export function strengthenInfo(form: CatForm): { threshold: number; mult: number } | null {
-  const a = form.ab;
-  if (a.strengthenBoost <= 0) return null;
-  return { threshold: a.strengthenStart, mult: 1 + a.strengthenBoost / 100 };
-}
+// ── 本能・超本能による能力解放を反映した実効ステータス ──────────
+// 本能で「めっぽう強い」「超ダメージ」「特効」「対象属性追加」などを獲得すると、
+// 基本形態には無い倍率が乗るようになる。本能Lv>0で解放とみなす。
+// (超本能も talents に含まれるので同じ仕組みで反映される)
 
-// クリティカル期待倍率(確率crit%で2倍)。未所持は null
-export function critInfo(form: CatForm): { prob: number; expectedMult: number } | null {
-  const a = form.ab;
-  if (a.crit <= 0) return null;
-  return { prob: a.crit, expectedMult: 1 + a.crit / 100 };
+// SkillAcquisition の abilityID → 解放される form.ab のキー(値を持たない解放系)
+const TALENT_AB_UNLOCK: Record<number, keyof FormAbilities> = {
+  5: "strong", // めっぽう強い
+  6: "resistant", // 打たれ強い
+  7: "massive", // 超ダメージ
+  14: "zombieKiller", // ゾンビキラー
+  63: "colossusSlayer", // 超生命体特効
+  64: "behemothSlayer", // 超獣特効
+  66: "sageSlayer", // 超賢者特効
+};
+// abilityID → 追加される攻撃対象属性
+const TALENT_TRAIT_ADD: Record<number, keyof CatForm["traits"]> = {
+  33: "red",
+  34: "floating",
+  35: "black",
+  36: "metal",
+  37: "angel",
+  38: "alien",
+  39: "zombie",
+  40: "relic",
+  41: "traitless",
+  57: "aku",
+};
+const TALENT_STRENGTHEN = 10; // 体力低下で攻撃力上昇
+const TALENT_CRIT = 13; // クリティカル
+
+export type ResolvedForm = {
+  traits: CatForm["traits"];
+  ab: FormAbilities;
+  strengthen: { threshold: number; mult: number } | null;
+  crit: { prob: number; expectedMult: number } | null;
+};
+
+export function resolveTalents(
+  form: CatForm,
+  talents: Talent[] | null,
+  levels: number[]
+): ResolvedForm {
+  const traits = { ...form.traits };
+  const ab: FormAbilities = { ...form.ab, immune: { ...form.ab.immune } };
+  let strengthenStart = form.ab.strengthenStart;
+  let strengthenBoost = form.ab.strengthenBoost;
+  let critProb = form.ab.crit;
+
+  if (talents) {
+    talents.forEach((t, i) => {
+      const lv = levels[i] ?? 0;
+      if (lv <= 0) return;
+      const abKey = TALENT_AB_UNLOCK[t.abilityId];
+      if (abKey) (ab[abKey] as boolean) = true;
+      const traitKey = TALENT_TRAIT_ADD[t.abilityId];
+      if (traitKey) traits[traitKey] = true;
+      if (t.abilityId === TALENT_STRENGTHEN) {
+        // slot0=発動する体力%, slot1=上昇する攻撃力%(Lvで増加)
+        strengthenStart = t.min[0] || strengthenStart;
+        strengthenBoost = Math.max(strengthenBoost, talentValue(t, lv, 1));
+      }
+      if (t.abilityId === TALENT_CRIT) {
+        critProb = Math.max(critProb, talentValue(t, lv, 0));
+      }
+    });
+  }
+
+  return {
+    traits,
+    ab,
+    strengthen:
+      strengthenBoost > 0
+        ? { threshold: strengthenStart, mult: 1 + strengthenBoost / 100 }
+        : null,
+    crit: critProb > 0 ? { prob: critProb, expectedMult: 1 + critProb / 100 } : null,
+  };
 }

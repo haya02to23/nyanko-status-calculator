@@ -7,8 +7,7 @@ import {
   framesToSec,
   talentValue,
   effectiveRows,
-  strengthenInfo,
-  critInfo,
+  resolveTalents,
   COMBO_ATK_UP,
   COMBO_HP_UP,
   COMBO_SPEED_UP,
@@ -149,18 +148,24 @@ export default function Calculator() {
     });
   }, [cat, form, level, plus, treasure, talentLv, selectedCombos]);
 
+  // 本能・超本能による能力解放を反映した実効ステータス
+  const resolved = useMemo(
+    () => (form ? resolveTalents(form, cat?.talents ?? null, talentLv) : null),
+    [form, cat, talentLv]
+  );
+
   // ダメージ補正を加味した対象別の実質値
   const effective = useMemo(() => {
-    if (!form || !result) return [];
+    if (!resolved || !result) return [];
     return effectiveRows(
-      form,
+      resolved,
       { atk: result.atk, hp: result.hp, dps: result.dps },
       treasure > 1 // お宝フル時は対属性お宝(超ダメ4倍等)も適用
     );
-  }, [form, result, treasure]);
+  }, [resolved, result, treasure]);
 
-  const strengthen = form ? strengthenInfo(form) : null;
-  const crit = form ? critInfo(form) : null;
+  const strengthen = resolved?.strengthen ?? null;
+  const crit = resolved?.crit ?? null;
 
   const unitName = (id: number, f: number) =>
     cats?.find((c) => c.id === id)?.forms[f]?.name ?? `No.${id + 1}`;
