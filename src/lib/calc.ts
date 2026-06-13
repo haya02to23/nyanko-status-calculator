@@ -239,45 +239,50 @@ export function effectiveRows(
     });
   };
 
-  // 対象属性に対するめっぽう/超ダメ/極ダメ・打たれ強い系。
-  // お宝対象属性(赤浮黒天使エイリアンゾンビメタル)とお宝対象外で倍率が変わるため行を分ける。
+  type Group = { label: string; atkMult: number; hpMult: number };
+
+  // ① 対象属性に対するめっぽう/超ダメ/極ダメ・打たれ強い系。
+  // お宝対象属性(赤浮黒天使エイリアンゾンビメタル)とお宝対象外で倍率が変わるため分ける。
+  const targetGroups: Group[] = [];
   const hasTargetDmg =
     a.massive || a.insaneDamage || a.strong || a.resistant || a.insanelyTough;
   if (hasTargetDmg) {
     const targetKeys = ATTACK_TARGET_KEYS.filter((k) => form.traits[k]);
     const treaKeys = targetKeys.filter((k) => (TREASURE_TRAIT_KEYS as readonly string[]).includes(k));
     const plainKeys = targetKeys.filter((k) => !(TREASURE_TRAIT_KEYS as readonly string[]).includes(k));
-    const addTargetRow = (keys: string[], bonus: boolean) => {
-      if (!keys.length) return;
+    const make = (keys: string[], bonus: boolean): Group | null => {
+      if (!keys.length) return null;
       const mt = bonus ? 1 : 0; // massive_t / resist_t
       const gAtk = bonus ? 0.3 : 0; // good_atk_t
       const gHp = bonus ? 0.1 : 0; // good_hp_t
-      const atkMult = a.massive
-        ? 3 + mt
-        : a.insaneDamage
-          ? 5 + mt
-          : a.strong
-            ? 1.5 + gAtk
-            : 1;
-      const hpMult = a.resistant
-        ? 4 + mt
-        : a.insanelyTough
-          ? 6 + mt
-          : a.strong
-            ? 1 / (0.5 - gHp)
-            : 1;
-      push(`対象(${keys.map((k) => TRAIT_SHORT[k]).join("・")})`, atkMult, hpMult);
+      const atkMult = a.massive ? 3 + mt : a.insaneDamage ? 5 + mt : a.strong ? 1.5 + gAtk : 1;
+      const hpMult = a.resistant ? 4 + mt : a.insanelyTough ? 6 + mt : a.strong ? 1 / (0.5 - gHp) : 1;
+      return { label: `対象(${keys.map((k) => TRAIT_SHORT[k]).join("・")})`, atkMult, hpMult };
     };
-    addTargetRow(treaKeys, treasureBonus);
-    addTargetRow(plainKeys, false);
+    const tg = make(treaKeys, treasureBonus);
+    const pg = make(plainKeys, false);
+    if (tg) targetGroups.push(tg);
+    if (pg) targetGroups.push(pg);
   }
 
-  // 種族特効・キラー(攻撃対象属性とは独立。お宝対象外で固定倍率)
-  if (a.behemothSlayer) push("超獣", 2.5, 1 / 0.6);
-  if (a.colossusSlayer) push("超生命体", 1.6, 1 / 0.7);
-  if (a.sageSlayer) push("超賢者", 1.2, 1 / 0.5);
-  if (a.witchKiller) push("魔女", 5, 10);
-  if (a.evaKiller) push("使徒", 5, 5);
+  // ② 種族特効・キラー(攻撃対象属性とは独立。お宝対象外で固定倍率)
+  const slayerGroups: Group[] = [];
+  if (a.behemothSlayer) slayerGroups.push({ label: "超獣", atkMult: 2.5, hpMult: 1 / 0.6 });
+  if (a.colossusSlayer) slayerGroups.push({ label: "超生命体", atkMult: 1.6, hpMult: 1 / 0.7 });
+  if (a.sageSlayer) slayerGroups.push({ label: "超賢者", atkMult: 1.2, hpMult: 1 / 0.5 });
+  if (a.witchKiller) slayerGroups.push({ label: "魔女", atkMult: 5, hpMult: 10 });
+  if (a.evaKiller) slayerGroups.push({ label: "使徒", atkMult: 5, hpMult: 5 });
+
+  // 単独の行(属性のみ / 特効のみ)
+  for (const g of targetGroups) push(g.label, g.atkMult, g.hpMult);
+  for (const g of slayerGroups) push(g.label, g.atkMult, g.hpMult);
+
+  // ③ 重複: 対象属性 かつ 特効種族(例: 赤い敵 かつ 超獣)→ 倍率は乗算
+  for (const tg of targetGroups) {
+    for (const sg of slayerGroups) {
+      push(`${tg.label} × ${sg.label}`, tg.atkMult * sg.atkMult, tg.hpMult * sg.hpMult);
+    }
+  }
 
   return rows;
 }
