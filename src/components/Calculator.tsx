@@ -435,8 +435,8 @@ export default function Calculator() {
 
           {/* 実質ステータス(ダメージ補正込み) — メイン表示 */}
           {(effective.length > 0 || strengthen || crit || savage || splash.length > 0) && (
-            <section className="rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-emerald-500/[0.07] to-transparent p-4 shadow-lg shadow-emerald-500/10 ring-1 ring-inset ring-emerald-500/10">
-              <h3 className="text-base font-bold text-emerald-400">
+            <section className="rounded-2xl border border-sky-500/40 bg-gradient-to-b from-sky-500/[0.07] to-transparent p-4 shadow-lg shadow-sky-500/10 ring-1 ring-inset ring-sky-500/10">
+              <h3 className="text-base font-bold text-sky-400">
                 実質ステータス
                 <span className="ml-2 text-xs font-normal text-ink-dim">
                   対象への補正込み / Lv{level}
@@ -465,13 +465,13 @@ export default function Calculator() {
                               {r.hpMult !== 1 && `耐×${r.hpMult.toFixed(2).replace(/\.?0+$/, "")}`}
                             </span>
                           </td>
-                          <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-emerald-300">
+                          <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-sky-300">
                             {r.atk.toLocaleString()}
                           </td>
                           <td className="py-1.5 pl-4 text-right tabular-nums">
                             {r.dps.toLocaleString()}
                           </td>
-                          <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-emerald-300">
+                          <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-sky-300">
                             {r.hp.toLocaleString()}
                           </td>
                         </tr>
@@ -584,7 +584,7 @@ export default function Calculator() {
               {effective.length > 0 ? (
                 effective.map((r) => (
                   <div key={r.label} className="mt-3">
-                    <p className="text-xs text-emerald-400">
+                    <p className="text-xs text-sky-400">
                       {r.label}
                       {r.atkMult !== 1 && ` 攻×${r.atkMult}`}
                     </p>
@@ -597,7 +597,7 @@ export default function Calculator() {
                           <span className="text-ink-dim">
                             {["①", "②", "③", "④"][i]} 射程 {hitRanges[i] ?? "-"}
                           </span>
-                          <span className="font-bold tabular-nums text-emerald-300">
+                          <span className="font-bold tabular-nums text-sky-300">
                             {dmg.toLocaleString()}
                           </span>
                         </li>
@@ -637,7 +637,7 @@ export default function Calculator() {
                 <p className="text-xs text-ink-dim">体力</p>
                 <p className="text-2xl font-bold tabular-nums">{result.hp.toLocaleString()}</p>
                 {(result.hpTalentPct > 0 || result.hpComboPct > 0) && (
-                  <p className="text-xs text-emerald-400">
+                  <p className="text-xs text-sky-400">
                     基準 {result.hpBase.toLocaleString()}
                     {result.hpTalentPct > 0 && ` / 本能+${result.hpTalentPct}%`}
                     {result.hpComboPct > 0 && ` / コンボ+${result.hpComboPct}%`}
@@ -653,7 +653,7 @@ export default function Calculator() {
                   </p>
                 )}
                 {(result.atkTalentPct > 0 || result.atkComboPct > 0) && (
-                  <p className="text-xs text-emerald-400">
+                  <p className="text-xs text-sky-400">
                     基準 {result.atkBase.toLocaleString()}
                     {result.atkTalentPct > 0 && ` / 本能+${result.atkTalentPct}%`}
                     {result.atkComboPct > 0 && ` / コンボ+${result.atkComboPct}%`}
@@ -755,7 +755,7 @@ export default function Calculator() {
                         <span className="ml-auto tabular-nums text-ink-dim">
                           Lv{lv}/{t.maxLv}
                           {vMax !== 0 && (
-                            <span className={lv > 0 ? "ml-2 text-emerald-400" : "ml-2"}>
+                            <span className={lv > 0 ? "ml-2 text-sky-400" : "ml-2"}>
                               {lv > 0 ? v : 0}
                               {[TALENT_HP_UP, TALENT_ATK_UP, TALENT_COST_DOWN].includes(
                                 t.abilityId
@@ -844,7 +844,7 @@ export default function Calculator() {
                         >
                           <div className="flex flex-wrap items-center gap-x-2">
                             <span className="font-bold">{c.name}</span>
-                            <span className={statCombo ? "text-emerald-400" : "text-ink-dim"}>
+                            <span className={statCombo ? "text-sky-400" : "text-ink-dim"}>
                               {comboEffectText(c, meta)}
                             </span>
                           </div>
