@@ -176,6 +176,204 @@ for (let id = 0; ; id++) {
   });
 }
 
+// ===========================================================================
+// 補完: BCData(正本)に無い情報だけ battlecatsinfo の最新データから追加する。
+//   1) BCDataに存在しない新規ユニット(ルーノス等)を丸ごと追加
+//   2) BCDataで本能データが欠けているユニット(セイバー等)に本能を補完
+// 既存ユニットのステータスは一切上書きしない。
+// ===========================================================================
+{
+  const BCI = join(RAW, "bci");
+  const scheme = JSON.parse(readFileSync(join(BCI, "units_scheme.json"), "utf8"));
+  const levelcurves = scheme.levelcurves; // [curveIdx][20]
+
+  // battlecatsinfo の talents 列(= SkillAcquisition の行から先頭id列を除いたもの)を
+  // 既存パーサと同じ形式に直して本能リストへ。
+  const parseTalents = (pipeStr) => {
+    if (!pipeStr || !pipeStr.trim()) return null;
+    const row = ["_", ...pipeStr.split("|")]; // 先頭にダミーidを足すとSkillAcquisitionと同形
+    const list = [];
+    for (let off = 2; off + 13 < row.length; off += 14) {
+      const abilityId = num(row[off]);
+      if (abilityId === 0) continue;
+      list.push({
+        abilityId,
+        maxLv: Math.max(1, num(row[off + 1])),
+        min: [num(row[off + 2]), num(row[off + 4]), num(row[off + 6]), num(row[off + 8])],
+        max: [num(row[off + 3]), num(row[off + 5]), num(row[off + 7]), num(row[off + 9])],
+        textId: num(row[off + 10]),
+        ultra: num(row[off + 13]) === 1,
+      });
+    }
+    return list.length ? list : null;
+  };
+
+  // ability文字列をデコード: "9@15!200|28&" -> { 9:[15,200], 28:[] }
+  const decodeAbility = (str) => {
+    const out = {};
+    if (!str || !str.trim()) return out;
+    for (const tok of str.split("|")) {
+      if (!tok) continue;
+      if (tok.includes("@")) {
+        const [id, rest] = tok.split("@");
+        out[num(id)] = rest.split("!").map(num);
+      } else if (tok.includes("&")) {
+        const [id, v] = tok.split("&");
+        out[num(id)] = v === "" || v === undefined ? [] : [num(v)];
+      } else {
+        out[num(tok)] = [];
+      }
+    }
+    return out;
+  };
+  const has = (ab, id) => Object.prototype.hasOwnProperty.call(ab, id);
+  const p = (ab, id, i) => ab[id]?.[i] ?? 0;
+
+  // trait/immunity ビットマスク → フラグ(units_scheme の並び順)
+  const decodeTraits = (mask) => ({
+    red: !!(mask & 1), floating: !!(mask & 2), black: !!(mask & 4), metal: !!(mask & 8),
+    angel: !!(mask & 16), alien: !!(mask & 32), zombie: !!(mask & 64), relic: !!(mask & 128),
+    traitless: !!(mask & 256), eva: !!(mask & 512), witch: !!(mask & 1024), aku: !!(mask & 2048),
+  });
+  const decodeImmune = (mask) => ({
+    wave: !!(mask & 1), freeze: !!(mask & 2), slow: !!(mask & 4), kb: !!(mask & 8),
+    surge: !!(mask & 16), weaken: !!(mask & 32), warp: !!(mask & 64), curse: !!(mask & 128),
+    toxic: !!(mask & 256), shockwave: !!(mask & 512), explosion: !!(mask & 1024),
+  });
+
+  // ability map → FormAbilities
+  const buildAb = (ab) => ({
+    strong: has(ab, 25), massive: has(ab, 28), insaneDamage: has(ab, 29),
+    resistant: has(ab, 26), insanelyTough: has(ab, 27),
+    kbProb: p(ab, 30, 0),
+    freezeProb: p(ab, 22, 0), freezeDur: p(ab, 22, 1),
+    slowProb: p(ab, 23, 0), slowDur: p(ab, 23, 1),
+    weakenProb: p(ab, 21, 0), weakenDur: p(ab, 21, 1), weakenPct: p(ab, 21, 2),
+    strengthenStart: p(ab, 1, 0), strengthenBoost: p(ab, 1, 1),
+    survive: p(ab, 2, 0), crit: p(ab, 4, 0),
+    attacksOnly: has(ab, 24), extraMoney: has(ab, 10), baseDestroyer: has(ab, 3),
+    waveProb: has(ab, 13) ? p(ab, 13, 0) : p(ab, 12, 0),
+    waveLevel: has(ab, 13) ? p(ab, 13, 1) : p(ab, 12, 1),
+    waveMini: has(ab, 12) && !has(ab, 13),
+    zombieKiller: has(ab, 5), witchKiller: has(ab, 19), evaKiller: has(ab, 20),
+    barrierBreak: p(ab, 7, 0), shieldPierce: p(ab, 8, 0),
+    warpProb: p(ab, 31, 0), warpDur: p(ab, 31, 1),
+    savageProb: p(ab, 9, 0), savageAdd: p(ab, 9, 1),
+    dodgeProb: p(ab, 32, 0), dodgeDur: p(ab, 32, 1),
+    surgeProb: has(ab, 15) ? p(ab, 15, 0) : p(ab, 14, 0),
+    surgeStart: has(ab, 15) ? p(ab, 15, 1) : p(ab, 14, 1),
+    surgeRange: has(ab, 15) ? p(ab, 15, 2) : p(ab, 14, 2),
+    surgeLevel: has(ab, 15) ? p(ab, 15, 3) : p(ab, 14, 3),
+    surgeMini: has(ab, 14) && !has(ab, 15),
+    curseProb: p(ab, 33, 0), curseDur: p(ab, 33, 1),
+    colossusSlayer: has(ab, 17), behemothSlayer: has(ab, 18),
+    behemothDodgeProb: p(ab, 18, 0), behemothDodgeDur: p(ab, 18, 1),
+    sageSlayer: has(ab, 42), metalKiller: has(ab, 44),
+    soulStrike: has(ab, 6), isMetal: has(ab, 11),
+    immune: { wave: false, kb: false, freeze: false, slow: false, weaken: false,
+      warp: false, curse: false, toxic: false, surge: false, shockwave: false, explosion: false },
+  });
+
+  // catstat.tsv を id ごとの form 配列に
+  const statLines = readFileSync(join(BCI, "catstat.tsv"), "utf8").split(/\r?\n/);
+  const sh = statLines[0].split("\t");
+  const col = Object.fromEntries(sh.map((h, i) => [h, i]));
+  const statById = new Map();
+  for (const line of statLines.slice(1)) {
+    if (!line.trim()) continue;
+    const r = line.split("\t");
+    const id = num(r[col.id]);
+    if (!statById.has(id)) statById.set(id, []);
+    statById.get(id).push(r);
+  }
+
+  // cat.tsv(unit メタ)
+  const catLines = readFileSync(join(BCI, "cat.tsv"), "utf8").split(/\r?\n/).slice(1);
+  const ch = readFileSync(join(BCI, "cat.tsv"), "utf8").split(/\r?\n/)[0].split("\t");
+  const cc = Object.fromEntries(ch.map((h, i) => [h, i]));
+
+  const parseLd = (s1, s2, i) => {
+    const a = (s1 || "").split("|").map(num);
+    const b = (s2 || "").split("|").map(num);
+    if (a[i] === undefined) return null;
+    if ((a[i] || 0) === 0 && (b[i] || 0) === 0) return null;
+    return { start: a[i] || 0, range: b[i] || 0 };
+  };
+
+  const existing = new Set(cats.map((c) => c.id));
+  let added = 0;
+  let filled = 0;
+
+  for (let id = 0; id < catLines.length; id++) {
+    const metaRow = catLines[id];
+    if (!metaRow || !metaRow.trim()) continue;
+    const m = metaRow.split("\t");
+    const talentStr = m[cc.talents];
+
+    // (2) 既存ユニットの本能補完(BCDataに本能が無い場合のみ)
+    if (existing.has(id)) {
+      const cat = cats.find((c) => c.id === id);
+      if (cat && !cat.talents) {
+        const t = parseTalents(talentStr);
+        if (t) { cat.talents = t; filled++; }
+      }
+      continue;
+    }
+
+    // (1) 新規ユニットを丸ごと追加
+    const statRows = statById.get(id);
+    if (!statRows) continue;
+    const formCount = num(m[cc.form_count]) || statRows.length;
+    const curve = levelcurves[num(m[cc.level_curve])] ?? levelcurves[0];
+    const forms = [];
+    for (let f = 0; f < Math.min(statRows.length, formCount); f++) {
+      const r = statRows[f];
+      const name = (r[col.name_jp] || "").trim();
+      if (!name) continue;
+      const ab = decodeAbility(r[col.ability]);
+      const fab = buildAb(ab);
+      fab.immune = decodeImmune(num(r[col.immunity]));
+      forms.push({
+        name,
+        desc: "",
+        hp: num(r[col.health_point]),
+        kb: num(r[col.knockbacks]),
+        speed: num(r[col.speed]),
+        atk: [num(r[col.attack_power_1]), num(r[col.attack_power_2]), num(r[col.attack_power_3])],
+        fore: [num(r[col.preswing_1]), num(r[col.preswing_2]), num(r[col.preswing_3])],
+        abilityHit: [true, num(r[col.attack_power_2]) > 0, num(r[col.attack_power_3]) > 0],
+        tba: num(r[col.time_between_attacks]),
+        range: num(r[col.range]),
+        cost: num(r[col.price]),
+        cd: num(r[col.cd]),
+        area: (num(r[col.attack_type]) & 2) !== 0,
+        backswing: num(r[col.backswing]),
+        freq: num(r[col.attack_frequency]),
+        ld: parseLd(r[col.long_distance_1], r[col.long_distance_2], 0) ?? { start: 0, range: 0 },
+        ld2: parseLd(r[col.long_distance_1], r[col.long_distance_2], 1),
+        ld3: parseLd(r[col.long_distance_1], r[col.long_distance_2], 2),
+        traits: decodeTraits(num(r[col.trait])),
+        ab: fab,
+      });
+    }
+    if (!forms.length) continue;
+    cats.push({
+      id,
+      rarity: num(m[cc.rarity]),
+      maxBase: num(m[cc.max_base_level]) || 0,
+      maxBaseNoEye: num(m[cc.max_base_level]) || 0,
+      maxPlus: num(m[cc.max_plus_level]) || 0,
+      growth: curve.map(num),
+      forms,
+      talents: parseTalents(talentStr),
+    });
+    added++;
+  }
+
+  cats.sort((a, b) => a.id - b.id);
+  console.log(`補完: 新規ユニット +${added}, 本能補完 ${filled}`);
+}
+
 // ---- にゃんコンボ ----
 const comboNames = readFileSync(join(RAW, "jp/resLocal/Nyancombo_ja.csv"), "utf8")
   .split(/\r?\n/).map((l) => l.split(",")[0].trim());

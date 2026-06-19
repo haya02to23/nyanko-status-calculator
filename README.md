@@ -13,11 +13,16 @@
 
 ## データソース
 
-- ステータス・本能・コンボ: [fieryhenry/BCData](https://github.com/fieryhenry/BCData) の日本版 15.0.0jp
+正本は BCData。そこに無い情報だけ battlecatsinfo から補完する方針(BCData以外は補助扱い)。
+
+- ステータス・本能・コンボ(正本): [fieryhenry/BCData](https://github.com/fieryhenry/BCData) の日本版 15.0.0jp
 - 攻撃頻度・後隙: [battlecatsinfo](https://github.com/battlecatsinfo/battlecatsinfo.github.io) の catstat.tsv
+- **補完**(`raw_data/bci/`): BCDataに無い新規ユニット(ルーノス等)と、BCDataで欠けている本能(セイバー等)のみ battlecatsinfo の catstat.tsv / cat.tsv / units_scheme.json から取得。既存ユニットのステータスは上書きしない
 - 列定義の参考: [fieryhenry/tbcml](https://github.com/fieryhenry/tbcml)
 
-`raw_data/` に元CSVを同梱。データ更新時は新しいバージョンのCSVに差し替えて:
+補完の仕組み: build-data.mjs 末尾で、BCDataに無いidのユニットを battlecatsinfo から丸ごと追加(ability文字列・trait/immunityビットマスク・成長カーブをデコード)し、本能が欠けている既存ユニットには cat.tsv の talents 列(SkillAcquisitionと同形式)を補完する。
+
+`raw_data/` に元データを同梱。更新時は新しいCSV/TSVに差し替えて:
 
 ```bash
 node scripts/build-data.mjs   # public/data/*.json を再生成
