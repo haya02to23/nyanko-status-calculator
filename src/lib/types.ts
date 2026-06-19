@@ -40,6 +40,7 @@ export type FormAbilities = {
   surgeRange: number;
   surgeLevel: number;
   surgeMini: boolean;
+  explosionProb: number;
   curseProb: number;
   curseDur: number;
   colossusSlayer: boolean;

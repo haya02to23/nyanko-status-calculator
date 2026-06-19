@@ -148,6 +148,7 @@ for (let id = 0; ; id++) {
         savageProb: c[82], savageAdd: c[83], dodgeProb: c[84], dodgeDur: c[85],
         surgeProb: c[86], surgeStart: c[87], surgeRange: c[88], surgeLevel: c[89],
         surgeMini: (c[108] ?? 0) === 1,
+        explosionProb: 0, // battlecatsinfo の ability から後段で補完(列位置が不安定なため)
         curseProb: c[92], curseDur: c[93],
         colossusSlayer: c[97] === 1, behemothSlayer: c[105] === 1,
         behemothDodgeProb: c[106] ?? 0, behemothDodgeDur: c[107] ?? 0,
@@ -265,6 +266,7 @@ for (let id = 0; ; id++) {
     surgeRange: has(ab, 15) ? p(ab, 15, 2) : p(ab, 14, 2),
     surgeLevel: has(ab, 15) ? p(ab, 15, 3) : p(ab, 14, 3),
     surgeMini: has(ab, 14) && !has(ab, 15),
+    explosionProb: p(ab, 45, 0),
     curseProb: p(ab, 33, 0), curseDur: p(ab, 33, 1),
     colossusSlayer: has(ab, 17), behemothSlayer: has(ab, 18),
     behemothDodgeProb: p(ab, 18, 0), behemothDodgeDur: p(ab, 18, 1),
@@ -370,8 +372,26 @@ for (let id = 0; ; id++) {
     added++;
   }
 
+  // 爆破攻撃(ability 45)の発動率を battlecatsinfo の ability から全キャラに補完。
+  // BCData の爆破列は行ごとに列数が変わり不安定なため、クリーンな ability 文字列を使う。
+  let expSet = 0;
+  for (const cat of cats) {
+    const statRows = statById.get(cat.id);
+    if (!statRows) continue;
+    cat.forms.forEach((form, f) => {
+      const r = statRows[f];
+      if (!r) return;
+      const ab = decodeAbility(r[col.ability]);
+      const prob = has(ab, 45) ? p(ab, 45, 0) : 0;
+      if (prob > 0) {
+        form.ab.explosionProb = prob;
+        expSet++;
+      }
+    });
+  }
+
   cats.sort((a, b) => a.id - b.id);
-  console.log(`補完: 新規ユニット +${added}, 本能補完 ${filled}`);
+  console.log(`補完: 新規ユニット +${added}, 本能補完 ${filled}, 爆破prob ${expSet}`);
 }
 
 // ---- にゃんコンボ ----

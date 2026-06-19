@@ -319,6 +319,53 @@ const TALENT_STRENGTHEN = 10; // 体力低下で攻撃力上昇
 const TALENT_CRIT = 13; // クリティカル
 const TALENT_SAVAGE = 50; // 渾身の一撃
 
+// 波動・烈波・爆破の追加ダメージ(攻撃力に対する倍率)。内部実装(battlecatsinfo)準拠:
+//   波動  : 発動時 atk×1.0(小波動0.2) / 期待 ×prob/100
+//   烈波  : 発動時 atk×level(小烈波 ×level×0.2) / 期待 ×(発動時)×prob/100
+//   爆破  : 発動時 atk×1.0 / 期待 ×prob/100
+export type SplashEffect = {
+  kind: "波動" | "烈波" | "爆破";
+  prob: number;
+  detail: string;
+  hitMult: number; // 発動時の追加攻撃力倍率
+  expectedMult: number; // 期待値の追加攻撃力倍率
+};
+
+export function splashEffects(form: CatForm): SplashEffect[] {
+  const a = form.ab;
+  const out: SplashEffect[] = [];
+  if (a.waveProb > 0) {
+    const ratio = a.waveMini ? 0.2 : 1;
+    out.push({
+      kind: "波動",
+      prob: a.waveProb,
+      detail: a.waveMini ? "小波動" : `Lv${a.waveLevel}`,
+      hitMult: ratio,
+      expectedMult: (ratio * a.waveProb) / 100,
+    });
+  }
+  if (a.surgeProb > 0) {
+    const ratio = (a.surgeMini ? 0.2 : 1) * Math.max(1, a.surgeLevel);
+    out.push({
+      kind: "烈波",
+      prob: a.surgeProb,
+      detail: `${a.surgeMini ? "小烈波 " : ""}Lv${a.surgeLevel}`,
+      hitMult: ratio,
+      expectedMult: (ratio * a.surgeProb) / 100,
+    });
+  }
+  if (a.explosionProb > 0) {
+    out.push({
+      kind: "爆破",
+      prob: a.explosionProb,
+      detail: "",
+      hitMult: 1,
+      expectedMult: a.explosionProb / 100,
+    });
+  }
+  return out;
+}
+
 export type ResolvedForm = {
   traits: CatForm["traits"];
   ab: FormAbilities;

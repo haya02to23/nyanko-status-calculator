@@ -8,6 +8,7 @@ import {
   talentValue,
   effectiveRows,
   resolveTalents,
+  splashEffects,
   COMBO_ATK_UP,
   COMBO_HP_UP,
   COMBO_SPEED_UP,
@@ -212,6 +213,7 @@ export default function Calculator() {
   const strengthen = resolved?.strengthen ?? null;
   const crit = resolved?.crit ?? null;
   const savage = resolved?.savage ?? null;
+  const splash = useMemo(() => (form ? splashEffects(form) : []), [form]);
 
   // 連続攻撃でヒットごとに射程が異なる場合の各ヒット射程帯
   const hitRanges = useMemo(() => (form ? activeHitRanges(form) : []), [form]);
@@ -407,7 +409,7 @@ export default function Calculator() {
           </section>
 
           {/* 実質ステータス(ダメージ補正込み) — メイン表示 */}
-          {(effective.length > 0 || strengthen || crit || savage) && (
+          {(effective.length > 0 || strengthen || crit || savage || splash.length > 0) && (
             <section className="rounded-2xl border border-emerald-500/40 bg-gradient-to-b from-emerald-500/[0.07] to-transparent p-4 shadow-lg shadow-emerald-500/10 ring-1 ring-inset ring-emerald-500/10">
               <h3 className="text-base font-bold text-emerald-400">
                 実質ステータス
@@ -453,7 +455,7 @@ export default function Calculator() {
                   </table>
                 </div>
               )}
-              {(strengthen || crit || savage) && result && (
+              {(strengthen || crit || savage || splash.length > 0) && result && (
                 <ul className="mt-3 space-y-1.5 text-xs text-ink">
                   {strengthen && (
                     <li>
@@ -492,6 +494,19 @@ export default function Calculator() {
                       )
                     </li>
                   )}
+                  {splash.map((s) => (
+                    <li key={s.kind}>
+                      ・{s.kind}
+                      {s.detail && `(${s.detail})`}: 発動率{s.prob}% / 発動時 追加ダメージ{" "}
+                      <span className="font-bold text-sky-300">
+                        +{Math.round(result.atk * s.hitMult).toLocaleString()}
+                      </span>{" "}
+                      / 期待 追加DPS{" "}
+                      <span className="font-bold text-sky-300">
+                        +{Math.round(result.dps * s.expectedMult).toLocaleString()}
+                      </span>
+                    </li>
+                  ))}
                 </ul>
               )}
               <p className="mt-2 text-[11px] text-ink-dim">
