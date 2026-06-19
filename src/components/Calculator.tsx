@@ -485,7 +485,7 @@ export default function Calculator() {
               {combinedRows.length > 0 && (
                 <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-500/5 p-3">
                   <p className="text-xs font-bold text-sky-300">
-                    波動・烈波・爆破込み 総ダメージ(期待)
+                    波動・烈波・爆破込み 総ダメージ(期待値)
                   </p>
                   <p className="mt-0.5 text-[11px] text-ink-dim">
                     含む効果:{" "}
@@ -494,16 +494,22 @@ export default function Calculator() {
                       .join(" / ")}
                   </p>
                   <table className="mt-2 w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-ink-dim">
+                        <th className="py-1 text-left font-normal">対象</th>
+                        <th className="py-1 pl-4 text-right font-normal">ダメージ</th>
+                        <th className="py-1 pl-4 text-right font-normal">DPS</th>
+                      </tr>
+                    </thead>
                     <tbody className="divide-y divide-line">
                       {combinedRows.map((r) => (
                         <tr key={r.label}>
                           <td className="py-1.5 pr-2 text-ink-dim">{r.label}</td>
                           <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-sky-200">
-                            {r.dps.toLocaleString()}
-                            <span className="ml-1 text-[11px] font-normal text-ink-dim">DPS</span>
+                            {r.atk.toLocaleString()}
                           </td>
-                          <td className="py-1.5 pl-4 text-right tabular-nums text-ink-dim">
-                            攻 {r.atk.toLocaleString()}
+                          <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-sky-200">
+                            {r.dps.toLocaleString()}
                           </td>
                         </tr>
                       ))}
