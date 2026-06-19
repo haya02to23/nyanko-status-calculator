@@ -404,31 +404,46 @@ const sizeNames = readFileSync(join(RAW, "jp/resLocal/Nyancombo2_ja.csv"), "utf8
 const comboParams = readFileSync(join(RAW, "jp/DataLocal/NyancomboParam.tsv"), "utf8")
   .split(/\r?\n/).filter((l) => l.trim()).map((l) => l.split("\t").map(num));
 
-// NyancomboData.csv は「1行=1効果」。先頭列がコンボID で、1つのコンボが
-// 複数行(複数効果)にまたがる場合がある(例: にゃんこ軍団=効果5+効果4)。
-// コンボID単位でまとめ、effects 配列に全効果を持たせる。
-const comboMap = new Map(); // comboId -> combo
-for (const row of readCsv(join(RAW, "jp/DataLocal/NyancomboData.csv"))) {
-  const c = row.map(num);
-  const comboId = c[0];
+// NyancomboData.csv と Nyancombo_ja.csv は行番号で 1:1 対応(1行=1コンボ=1効果)。
+// ただし先頭ブロック(0〜)は旧データで、2ブロック目(「にゃんこ軍団」2回目以降)が
+// 現行の正しいデータ(例: アイラブジャパンは旧=攻撃力小, 現行=攻撃力中)。
+// よって2ブロック目だけを採用する。
+const comboDataLines = readFileSync(join(RAW, "jp/DataLocal/NyancomboData.csv"), "utf8")
+  .split(/\r?\n/);
+const block2Start = (() => {
+  const i = comboNames.indexOf(comboNames[0], 1); // にゃんこ軍団 の2回目
+  return i > 0 ? i : 0;
+})();
+const combos = [];
+const seenCombo = new Set();
+const addCombo = (i) => {
+  const name = comboNames[i];
+  const line = comboDataLines[i];
+  if (!name || !line || !line.trim()) return;
+  const c = line.split(",").map(num);
   const effect = c[13];
   const size = c[14];
-  if (effect < 0 || !comboNames[comboId]) continue;
-  if (!comboMap.has(comboId)) {
-    const units = [];
-    for (let i = 3; i <= 11; i += 2) {
-      if (c[i] >= 0) units.push([c[i], c[i + 1]]);
-    }
-    if (!units.length) continue;
-    comboMap.set(comboId, { id: comboId, name: comboNames[comboId], units, effects: [] });
+  if (effect < 0) return;
+  const units = [];
+  for (let j = 3; j <= 11; j += 2) {
+    if (c[j] >= 0) units.push([c[j], c[j + 1]]);
   }
-  comboMap.get(comboId).effects.push({
-    effect,
-    size,
-    value: comboParams[effect]?.[size] ?? 0,
+  if (!units.length) return;
+  // 同名+同構成の重複は除外(block2を先に処理するので現行の効果値が残る)
+  const key = name + "|" + units.map((u) => u.join("-")).join(",");
+  if (seenCombo.has(key)) return;
+  seenCombo.add(key);
+  combos.push({
+    id: i,
+    name,
+    units,
+    effects: [{ effect, size, value: comboParams[effect]?.[size] ?? 0 }],
   });
-}
-const combos = [...comboMap.values()];
+};
+// 現行(block2)を優先。その後 block1 のみに存在する旧来コンボ(ヒーローズ等)を追加。
+for (let i = block2Start; i < comboNames.length; i++) addCombo(i);
+for (let i = 0; i < block2Start; i++) addCombo(i);
+combos.sort((a, b) => a.id - b.id);
 
 const meta = {
   rarities: ["基本", "EX", "レア", "激レア", "超激レア", "伝説レア"],
