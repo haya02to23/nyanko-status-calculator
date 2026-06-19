@@ -83,6 +83,23 @@ function talentLabel(abilityId: number, textId: number, meta: Meta): string {
   return desc.split("<br>")[0] || `本能${abilityId}`;
 }
 
+// ユニットアイコン(public/icons/units/{id}.webp)。遅延読込で見えた分だけ取得。
+function UnitIcon({ id, className = "" }: { id: number; className?: string }) {
+  return (
+    <img
+      src={`/icons/units/${id}.webp`}
+      alt=""
+      loading="lazy"
+      width={104}
+      height={79}
+      className={`shrink-0 rounded-md bg-sunken object-contain ring-1 ring-line/60 ${className}`}
+      onError={(e) => {
+        e.currentTarget.style.visibility = "hidden";
+      }}
+    />
+  );
+}
+
 export default function Calculator() {
   const [cats, setCats] = useState<Cat[] | null>(null);
   const [combosAll, setCombosAll] = useState<Combo[] | null>(null);
@@ -292,8 +309,9 @@ export default function Calculator() {
               <li key={c.id}>
                 <button
                   onClick={() => selectCat(c)}
-                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-surface-2"
+                  className="flex w-full items-center gap-2 px-4 py-2 text-left hover:bg-surface-2"
                 >
+                  <UnitIcon id={c.id} className="h-8" />
                   <span
                     className={`shrink-0 rounded px-1.5 py-0.5 text-xs text-white ${RARITY_COLORS[c.rarity]}`}
                   >
@@ -323,8 +341,9 @@ export default function Calculator() {
                   <button
                     key={c.id}
                     onClick={() => selectCat(c)}
-                    className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-sm hover:border-brand"
+                    className="flex items-center gap-1.5 rounded-full border border-line bg-surface py-1 pl-1 pr-3 text-sm hover:border-brand"
                   >
+                    <UnitIcon id={c.id} className="h-6" />
                     <span
                       className={`rounded px-1 py-0.5 text-[10px] text-white ${RARITY_COLORS[c.rarity]}`}
                     >
@@ -343,14 +362,19 @@ export default function Calculator() {
         <div className="mt-4 space-y-4">
           {/* キャラヘッダ + 形態切替 */}
           <section className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-black/20">
-            <div className="flex items-center gap-2">
-              <span
-                className={`rounded px-1.5 py-0.5 text-xs text-white ${RARITY_COLORS[cat.rarity]}`}
-              >
-                {meta.rarities[cat.rarity]}
-              </span>
-              <h2 className="text-lg font-bold">{form.name}</h2>
-              <span className="ml-auto text-xs text-ink-dim">No.{cat.id + 1}</span>
+            <div className="flex items-center gap-2.5">
+              <UnitIcon id={cat.id} className="h-11" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`shrink-0 rounded px-1.5 py-0.5 text-xs text-white ${RARITY_COLORS[cat.rarity]}`}
+                  >
+                    {meta.rarities[cat.rarity]}
+                  </span>
+                  <span className="text-xs text-ink-dim">No.{cat.id + 1}</span>
+                </div>
+                <h2 className="mt-0.5 truncate text-lg font-bold">{form.name}</h2>
+              </div>
             </div>
             {form.desc && <p className="mt-1 text-xs text-ink-dim">{form.desc}</p>}
             <div className="mt-3 flex flex-wrap gap-1.5">
