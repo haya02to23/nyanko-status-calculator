@@ -214,6 +214,31 @@ export default function Calculator() {
   const crit = resolved?.crit ?? null;
   const savage = resolved?.savage ?? null;
   const splash = useMemo(() => (form ? splashEffects(form) : []), [form]);
+  // 波動・烈波・爆破は攻撃力倍率(rv)に期待値で加算され、その後に対象補正が乗る。
+  // よって「splash込み総ダメージ = 通常実質ダメージ × splashMult」。
+  const splashMult = useMemo(
+    () => splash.reduce((m, s) => m + s.expectedMult, 1),
+    [splash]
+  );
+  // splash込みの対象別総ダメージ(期待)。対象補正が無いキャラ(キャスリィ等)も
+  // 「全般」1行で烈波込みの総ダメージを出す。
+  const combinedRows = useMemo(() => {
+    if (!result || splash.length === 0) return [];
+    if (effective.length > 0) {
+      return effective.map((r) => ({
+        label: r.label,
+        atk: Math.round(r.atk * splashMult),
+        dps: Math.round(r.dps * splashMult),
+      }));
+    }
+    return [
+      {
+        label: "全般(対象補正なし)",
+        atk: Math.round(result.atk * splashMult),
+        dps: Math.round(result.dps * splashMult),
+      },
+    ];
+  }, [effective, result, splash, splashMult]);
 
   // 連続攻撃でヒットごとに射程が異なる場合の各ヒット射程帯
   const hitRanges = useMemo(() => (form ? activeHitRanges(form) : []), [form]);
@@ -455,7 +480,42 @@ export default function Calculator() {
                   </table>
                 </div>
               )}
-              {(strengthen || crit || savage || splash.length > 0) && result && (
+
+              {/* 波動・烈波・爆破込みの総ダメージ(対象補正も乗せた期待値) */}
+              {combinedRows.length > 0 && (
+                <div className="mt-3 rounded-xl border border-sky-500/30 bg-sky-500/5 p-3">
+                  <p className="text-xs font-bold text-sky-300">
+                    波動・烈波・爆破込み 総ダメージ(期待)
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-ink-dim">
+                    含む効果:{" "}
+                    {splash
+                      .map((s) => `${s.kind}${s.detail ? `(${s.detail})` : ""} ${s.prob}%`)
+                      .join(" / ")}
+                  </p>
+                  <table className="mt-2 w-full text-sm">
+                    <tbody className="divide-y divide-line">
+                      {combinedRows.map((r) => (
+                        <tr key={r.label}>
+                          <td className="py-1.5 pr-2 text-ink-dim">{r.label}</td>
+                          <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-sky-200">
+                            {r.dps.toLocaleString()}
+                            <span className="ml-1 text-[11px] font-normal text-ink-dim">DPS</span>
+                          </td>
+                          <td className="py-1.5 pl-4 text-right tabular-nums text-ink-dim">
+                            攻 {r.atk.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="mt-1.5 text-[11px] text-ink-dim">
+                    通常攻撃 + 波動/烈波/爆破の期待値(×{splashMult.toFixed(2)})に対象補正を掛けた総ダメージ。
+                  </p>
+                </div>
+              )}
+
+              {(strengthen || crit || savage) && result && (
                 <ul className="mt-3 space-y-1.5 text-xs text-ink">
                   {strengthen && (
                     <li>
@@ -494,19 +554,6 @@ export default function Calculator() {
                       )
                     </li>
                   )}
-                  {splash.map((s) => (
-                    <li key={s.kind}>
-                      ・{s.kind}
-                      {s.detail && `(${s.detail})`}: 発動率{s.prob}% / 発動時 追加ダメージ{" "}
-                      <span className="font-bold text-sky-300">
-                        +{Math.round(result.atk * s.hitMult).toLocaleString()}
-                      </span>{" "}
-                      / 期待 追加DPS{" "}
-                      <span className="font-bold text-sky-300">
-                        +{Math.round(result.dps * s.expectedMult).toLocaleString()}
-                      </span>
-                    </li>
-                  ))}
                 </ul>
               )}
               <p className="mt-2 text-[11px] text-ink-dim">
