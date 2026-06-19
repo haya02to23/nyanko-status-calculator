@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Calculator from "@/components/Calculator";
 
 export default function Home() {
@@ -7,9 +8,9 @@ export default function Home() {
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden
-            className="grid h-9 w-9 place-items-center rounded-xl bg-brand/15 text-lg ring-1 ring-brand/30"
+            className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl"
           >
-            🐾
+            <Image src="/icon/icon_ver2.PNG" alt="" width={36} height={36} className="object-cover" />
           </span>
           <div>
             <h1 className="text-lg font-bold tracking-tight text-ink">

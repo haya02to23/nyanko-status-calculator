@@ -310,7 +310,7 @@ export default function Calculator() {
 
       {!cat && (
         <div className="mt-10 text-center text-ink-dim">
-          <p className="text-5xl">🐱</p>
+          <img src="/icon/icon_nyanko.PNG" alt="" className="mx-auto h-24 w-auto" />
           <p className="mt-4">キャラ名を検索して選択してください</p>
           <p className="mt-2 text-sm text-ink-dim">
             レベル・本能・にゃんコンボ・ダメージ補正込みの実質ステータスを計算します
