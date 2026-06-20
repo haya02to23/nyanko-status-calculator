@@ -214,12 +214,15 @@ export default function Calculator() {
       .filter((c): c is Cat => !!c);
   }, [cats, history]);
 
-  // 本能は第3形態(index 2)以降でのみ有効。第1・第2形態では本能なしで計算する
+  // 本能は第3形態(index 2)以降で有効。超本能(ultra)はさらにLv60以上でのみ有効。
   const talentsActive = formIdx >= 2;
-  const activeTalentLv = useMemo(
-    () => (talentsActive ? talentLv : []),
-    [talentsActive, talentLv]
-  );
+  const ultraActive = level >= 60;
+  const activeTalentLv = useMemo(() => {
+    if (!talentsActive || !cat?.talents) return [];
+    return cat.talents.map((t, i) =>
+      t.ultra && !ultraActive ? 0 : talentLv[i] ?? 0
+    );
+  }, [talentsActive, ultraActive, cat, talentLv]);
 
   const result = useMemo(() => {
     if (!cat || !form) return null;
@@ -788,29 +791,39 @@ export default function Calculator() {
               </div>
               <div className="mt-3 space-y-3">
                 {cat.talents.map((t, i) => {
-                  const lv = talentLv[i] ?? 0;
+                  // 超本能はLv60以上でのみ解放。未解放なら値0扱い＆スライダー無効
+                  const locked = t.ultra && !ultraActive;
+                  const lv = locked ? 0 : talentLv[i] ?? 0;
                   const v = talentValue(t, lv);
                   const vMax = talentValue(t, t.maxLv);
                   return (
-                    <div key={i}>
+                    <div key={i} className={locked ? "opacity-50" : ""}>
                       <div className="flex items-center gap-2 text-sm">
                         {t.ultra && (
                           <span className="rounded bg-fuchsia-600 px-1 text-[10px]">超</span>
                         )}
                         <span>{talentLabel(t.abilityId, t.textId, meta)}</span>
                         <span className="ml-auto tabular-nums text-ink-dim">
-                          Lv{lv}/{t.maxLv}
-                          {vMax !== 0 && (
-                            <span className={lv > 0 ? "ml-2 text-sky-400" : "ml-2"}>
-                              {lv > 0 ? v : 0}
-                              {[TALENT_HP_UP, TALENT_ATK_UP, TALENT_COST_DOWN].includes(
-                                t.abilityId
-                              )
-                                ? "%"
-                                : [TALENT_CD_DOWN, TALENT_INTERVAL_DOWN].includes(t.abilityId)
-                                  ? "F"
-                                  : ""}
-                            </span>
+                          {locked ? (
+                            <span className="text-[11px]">Lv60で解放</span>
+                          ) : (
+                            <>
+                              Lv{lv}/{t.maxLv}
+                              {vMax !== 0 && (
+                                <span className={lv > 0 ? "ml-2 text-sky-400" : "ml-2"}>
+                                  {lv > 0 ? v : 0}
+                                  {[TALENT_HP_UP, TALENT_ATK_UP, TALENT_COST_DOWN].includes(
+                                    t.abilityId
+                                  )
+                                    ? "%"
+                                    : [TALENT_CD_DOWN, TALENT_INTERVAL_DOWN].includes(
+                                          t.abilityId
+                                        )
+                                      ? "F"
+                                      : ""}
+                                </span>
+                              )}
+                            </>
                           )}
                         </span>
                       </div>
@@ -819,12 +832,13 @@ export default function Calculator() {
                         min={0}
                         max={t.maxLv}
                         value={lv}
+                        disabled={locked}
                         onChange={(e) => {
                           const next = [...talentLv];
                           next[i] = Number(e.target.value);
                           setTalentLv(next);
                         }}
-                        className="mt-1 w-full accent-brand"
+                        className="mt-1 w-full accent-brand disabled:cursor-not-allowed"
                       />
                     </div>
                   );
