@@ -315,8 +315,12 @@ export default function Calculator() {
     const sv = savage?.hitMult ?? 1;
     return st * (sv + (splashHitMult - 1));
   }, [strengthen, savage, splashHitMult]);
+  // 確率/条件発動が絡む時だけ最大火力を出す。100%波動/烈波/爆破のみ(キャスリィ等)は
+  // 総ダメージ(期待値)と一致するので最大火力は不要。
+  const burstProbabilistic =
+    !!strengthen || !!savage || splash.some((s) => s.prob < 100);
   const maxRows = useMemo(() => {
-    if (!effBase || burstMult <= 1.0001) return [];
+    if (!effBase || burstMult <= 1.0001 || !burstProbabilistic) return [];
     // 特効込みのベースを先頭に、属性超ダメ行を下に
     const rows = [
       { label: activeSlayerLabel || "全般", atk: Math.round(effBase.atk * burstMult) },
@@ -325,7 +329,7 @@ export default function Calculator() {
       rows.push({ label: r.label, atk: Math.round(r.atk * burstMult) });
     }
     return rows;
-  }, [effective, effBase, activeSlayerLabel, burstMult]);
+  }, [effective, effBase, activeSlayerLabel, burstMult, burstProbabilistic]);
 
   // 実質ステータス表の表示行: 特効込みベースを先頭に、属性超ダメ行を下に。
   // 特効を持つキャラは属性超ダメが無くてもベース1行を出す(トグルで切替表示)。
@@ -765,45 +769,68 @@ export default function Calculator() {
               )}
 
               {(strengthen || crit || savage) && effBase && (
-                <ul className="mt-3 space-y-1.5 text-xs text-ink">
-                  {strengthen && (
-                    <li>
-                      ・攻撃力上昇: 体力{strengthen.threshold}%以下で攻撃力 ×
-                      {strengthen.mult.toFixed(2)}(発動時 攻撃力{" "}
-                      <span className="font-bold text-brand">
-                        {Math.round(effBase.atk * strengthen.mult).toLocaleString()}
-                      </span>
-                      )
-                    </li>
-                  )}
-                  {crit && (
-                    <li>
-                      ・クリティカル: 発動率{crit.prob}% / 発動時 攻撃力{" "}
-                      <span className="font-bold text-brand">
-                        ×2 = {Math.round(effBase.atk * crit.hitMult).toLocaleString()}
-                      </span>{" "}
-                      / 期待DPS ×{crit.expectedMult.toFixed(2)}(
-                      <span className="font-bold text-brand">
-                        {Math.round(effBase.dps * crit.expectedMult).toLocaleString()}
-                      </span>
-                      )
-                    </li>
-                  )}
-                  {savage && (
-                    <li>
-                      ・渾身の一撃: 発動率{savage.prob}% / 威力+{savage.add}% / 発動時 攻撃力{" "}
-                      <span className="font-bold text-brand">
-                        ×{savage.hitMult.toFixed(2)} ={" "}
-                        {Math.round(effBase.atk * savage.hitMult).toLocaleString()}
-                      </span>{" "}
-                      / 期待DPS ×{savage.expectedMult.toFixed(2)}(
-                      <span className="font-bold text-brand">
-                        {Math.round(effBase.dps * savage.expectedMult).toLocaleString()}
-                      </span>
-                      )
-                    </li>
-                  )}
-                </ul>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-ink-dim">
+                        <th className="py-1 text-left font-normal">発動系効果</th>
+                        <th className="py-1 pl-4 text-right font-normal">発動時ダメージ</th>
+                        <th className="py-1 pl-4 text-right font-normal">期待DPS</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {strengthen && (
+                        <tr>
+                          <td className="py-1.5 pr-2">
+                            攻撃力上昇
+                            <span className="ml-1 text-xs text-ink-dim">
+                              体力{strengthen.threshold}%以下 ×
+                              {strengthen.mult.toFixed(2).replace(/\.?0+$/, "")}
+                            </span>
+                          </td>
+                          <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-sky-300">
+                            {Math.round(effBase.atk * strengthen.mult).toLocaleString()}
+                          </td>
+                          <td className="py-1.5 pl-4 text-right tabular-nums">
+                            {Math.round(effBase.dps * strengthen.mult).toLocaleString()}
+                          </td>
+                        </tr>
+                      )}
+                      {crit && (
+                        <tr>
+                          <td className="py-1.5 pr-2">
+                            クリティカル
+                            <span className="ml-1 text-xs text-ink-dim">
+                              発動率{crit.prob}% ×2
+                            </span>
+                          </td>
+                          <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-sky-300">
+                            {Math.round(effBase.atk * crit.hitMult).toLocaleString()}
+                          </td>
+                          <td className="py-1.5 pl-4 text-right tabular-nums">
+                            {Math.round(effBase.dps * crit.expectedMult).toLocaleString()}
+                          </td>
+                        </tr>
+                      )}
+                      {savage && (
+                        <tr>
+                          <td className="py-1.5 pr-2">
+                            渾身の一撃
+                            <span className="ml-1 text-xs text-ink-dim">
+                              発動率{savage.prob}% 威力+{savage.add}%
+                            </span>
+                          </td>
+                          <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-sky-300">
+                            {Math.round(effBase.atk * savage.hitMult).toLocaleString()}
+                          </td>
+                          <td className="py-1.5 pl-4 text-right tabular-nums">
+                            {Math.round(effBase.dps * savage.expectedMult).toLocaleString()}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               )}
               <p className="mt-2 text-[11px] text-ink-dim">
                 ※ベース値=本能・コンボ込みの攻撃力/体力/DPS。対象に該当する敵にのみ補正が乗ります。
