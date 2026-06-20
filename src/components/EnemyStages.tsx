@@ -30,6 +30,23 @@ const norm = (s: string) =>
     .toLowerCase()
     .replace(/[ぁ-ん]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
 
+// 敵アイコン(public/icons/enemies/{id}.webp)。遅延読込・無ければ非表示。
+function EnemyIcon({ id, className = "" }: { id: number; className?: string }) {
+  return (
+    <img
+      src={`/icons/enemies/${id}.webp`}
+      alt=""
+      loading="lazy"
+      width={104}
+      height={79}
+      className={`shrink-0 rounded bg-sunken object-contain ring-1 ring-line/60 ${className}`}
+      onError={(e) => {
+        e.currentTarget.style.visibility = "hidden";
+      }}
+    />
+  );
+}
+
 // 敵の詳細(ステータス + 属性 + 能力)。倍率を渡すと実値表示。
 function EnemyDetail({
   e,
@@ -50,6 +67,20 @@ function EnemyDetail({
   );
   return (
     <div className="mt-1 rounded-lg bg-sunken p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <img
+          src={`/icons/enemies/${e.id}.webp`}
+          alt=""
+          loading="lazy"
+          width={104}
+          height={79}
+          className="h-12 shrink-0 rounded bg-surface object-contain ring-1 ring-line/60"
+          onError={(ev) => {
+            ev.currentTarget.style.visibility = "hidden";
+          }}
+        />
+        <span className="font-bold">{e.name}</span>
+      </div>
       <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
         <Row label="体力">
           <span className="text-base font-bold text-sky-300">{realHp.toLocaleString()}</span>
@@ -310,8 +341,9 @@ export default function EnemyStages() {
                                   <li key={key}>
                                     <button
                                       onClick={() => setOpenEnemyKey(open ? null : key)}
-                                      className="flex w-full items-baseline gap-2 rounded-md px-1 py-1 text-left text-sm hover:bg-surface-2"
+                                      className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-sm hover:bg-surface-2"
                                     >
+                                      <EnemyIcon id={r.e.id} className="h-7" />
                                       <span>
                                         {r.e.name}
                                         {r.count > 1 && (
@@ -368,8 +400,9 @@ export default function EnemyStages() {
                 <div key={e.id} className="overflow-hidden rounded-xl border border-line bg-surface">
                   <button
                     onClick={() => setOpenEnemyKey(open ? null : `e${e.id}`)}
-                    className="flex w-full items-baseline gap-2 px-4 py-2.5 text-left hover:bg-surface-2"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-surface-2"
                   >
+                    <EnemyIcon id={e.id} className="h-8" />
                     <span className="font-bold">{e.name}</span>
                     {e.traits.length > 0 && (
                       <span className="text-[10px] text-ink-dim">[{e.traits.join("")}]</span>
