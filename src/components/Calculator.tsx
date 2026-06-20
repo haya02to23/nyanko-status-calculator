@@ -295,12 +295,28 @@ export default function Calculator() {
   }, [strengthen, savage, splashHitMult]);
   const maxRows = useMemo(() => {
     if (!result || burstMult <= 1.0001) return [];
-    const base =
-      effective.length > 0
-        ? effective.map((r) => ({ label: r.label, atk: r.atk }))
-        : [{ label: "全般", atk: result.atk }];
-    return base.map((r) => ({ label: r.label, atk: Math.round(r.atk * burstMult) }));
+    // 「全般(素×本能)」をベースに、対象補正(超ダメ/特効)は下の行に並べる
+    const rows = [{ label: "全般", atk: Math.round(result.atk * burstMult) }];
+    for (const r of effective) {
+      rows.push({ label: r.label, atk: Math.round(r.atk * burstMult) });
+    }
+    return rows;
   }, [effective, result, burstMult]);
+
+  // 実質ステータス表の表示行: 「全般(素×本能)」を先頭に、対象補正行(超ダメ/特効)を下に。
+  const effectiveDisplay = useMemo(() => {
+    if (!result || effective.length === 0) return [];
+    const base = {
+      label: "全般",
+      atkMult: 1,
+      hpMult: 1,
+      atk: result.atk,
+      hp: result.hp,
+      dps: result.dps,
+      atkHits: result.atkHits,
+    };
+    return [base, ...effective];
+  }, [effective, result]);
 
   // 連続攻撃でヒットごとに射程が異なる場合の各ヒット射程帯
   const hitRanges = useMemo(() => (form ? activeHitRanges(form) : []), [form]);
@@ -575,7 +591,7 @@ export default function Calculator() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
-                      {effective.map((r) => (
+                      {effectiveDisplay.map((r) => (
                         <tr key={r.label}>
                           <td className="py-1.5 pr-2">
                             {r.label}
