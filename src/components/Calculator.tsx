@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { Cat, Combo, Meta } from "@/lib/types";
 import {
@@ -381,7 +382,7 @@ export default function Calculator() {
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
   const header = (
-    <header className="mx-auto max-w-3xl px-4 pt-7 pb-1">
+    <header className="mx-auto flex max-w-3xl items-center gap-2.5 px-4 pt-7 pb-1">
       <button
         onClick={goHome}
         aria-label="ホームに戻る"
@@ -408,6 +409,12 @@ export default function Calculator() {
           </p>
         </div>
       </button>
+      <Link
+        href="/enemies"
+        className="ml-auto shrink-0 rounded-lg bg-surface-2 px-3 py-1.5 text-sm text-ink-dim hover:text-ink"
+      >
+        敵・ステージ →
+      </Link>
     </header>
   );
 
