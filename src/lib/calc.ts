@@ -265,26 +265,24 @@ export function effectiveRows(
     if (pg) targetGroups.push(pg);
   }
 
-  // ② 種族特効・キラー(攻撃対象属性とは独立。お宝対象外で固定倍率)
-  const slayerGroups: Group[] = [];
-  if (a.behemothSlayer) slayerGroups.push({ label: "超獣", atkMult: 2.5, hpMult: 1 / 0.6 });
-  if (a.colossusSlayer) slayerGroups.push({ label: "超生命体", atkMult: 1.6, hpMult: 1 / 0.7 });
-  if (a.sageSlayer) slayerGroups.push({ label: "超賢者", atkMult: 1.2, hpMult: 1 / 0.5 });
-  if (a.witchKiller) slayerGroups.push({ label: "魔女", atkMult: 5, hpMult: 10 });
-  if (a.evaKiller) slayerGroups.push({ label: "使徒", atkMult: 5, hpMult: 5 });
-
-  // 単独の行(属性のみ / 特効のみ)
+  // 属性超ダメ/打たれ強い系の行のみ(特効・キラーはトグルで別管理 → slayerGroupsOf)
   for (const g of targetGroups) push(g.label, g.atkMult, g.hpMult);
-  for (const g of slayerGroups) push(g.label, g.atkMult, g.hpMult);
-
-  // ③ 重複: 対象属性 かつ 特効種族(例: 赤い敵 かつ 超獣)→ 倍率は乗算
-  for (const tg of targetGroups) {
-    for (const sg of slayerGroups) {
-      push(`${tg.label} × ${sg.label}`, tg.atkMult * sg.atkMult, tg.hpMult * sg.hpMult);
-    }
-  }
 
   return rows;
+}
+
+// 種族特効・キラー(超獣/超生命体/超賢者/魔女/使徒)。攻撃対象属性とは独立の固定倍率。
+// UI側でon/offトグルにして、ONのものをベース値に乗算する。
+export type SlayerGroup = { key: string; label: string; atkMult: number; hpMult: number };
+export function slayerGroupsOf(form: { ab: FormAbilities }): SlayerGroup[] {
+  const a = form.ab;
+  const out: SlayerGroup[] = [];
+  if (a.behemothSlayer) out.push({ key: "behemoth", label: "超獣", atkMult: 2.5, hpMult: 1 / 0.6 });
+  if (a.colossusSlayer) out.push({ key: "colossus", label: "超生命体", atkMult: 1.6, hpMult: 1 / 0.7 });
+  if (a.sageSlayer) out.push({ key: "sage", label: "超賢者", atkMult: 1.2, hpMult: 1 / 0.5 });
+  if (a.witchKiller) out.push({ key: "witch", label: "魔女", atkMult: 5, hpMult: 10 });
+  if (a.evaKiller) out.push({ key: "eva", label: "使徒", atkMult: 5, hpMult: 5 });
+  return out;
 }
 
 // ── 本能・超本能による能力解放を反映した実効ステータス ──────────

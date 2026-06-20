@@ -7,6 +7,7 @@ import {
   framesToSec,
   talentValue,
   effectiveRows,
+  slayerGroupsOf,
   resolveTalents,
   splashEffects,
   COMBO_ATK_UP,
@@ -131,6 +132,8 @@ export default function Calculator() {
   const [comboQuery, setComboQuery] = useState("");
   const [comboOpen, setComboOpen] = useState(false);
   const [history, setHistory] = useState<number[]>([]);
+  // OFFにした特攻のkey集合(デフォルトは全ON=「全部盛り」)
+  const [slayerOff, setSlayerOff] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     Promise.all(
@@ -182,6 +185,7 @@ export default function Calculator() {
     setLevel(defaultLevelForForm(lastIdx, maxBase));
     setPlus(0);
     setTalentLv(c.talents ? c.talents.map((t) => t.maxLv) : []);
+    setSlayerOff(new Set());
     setQuery("");
     // 検索履歴を更新(先頭に追加・重複除去・最大8件)
     setHistory((prev) => {
@@ -241,15 +245,31 @@ export default function Calculator() {
     [form, cat, activeTalentLv]
   );
 
-  // ダメージ補正を加味した対象別の実質値
+  // 特効/キラー(超獣・超生命体など)。on/offトグルで全ステータスに一括反映する。
+  const slayers = useMemo(() => (resolved ? slayerGroupsOf(resolved) : []), [resolved]);
+  const activeSlayers = useMemo(
+    () => slayers.filter((s) => !slayerOff.has(s.key)),
+    [slayers, slayerOff]
+  );
+  const slayerAtkMult = activeSlayers.reduce((m, s) => m * s.atkMult, 1);
+  const slayerHpMult = activeSlayers.reduce((m, s) => m * s.hpMult, 1);
+  const activeSlayerLabel = activeSlayers.map((s) => s.label).join("・");
+  // 特効ONを織り込んだベース値(実質ステータス・最大火力・総ダメージの共通土台)
+  const effBase = useMemo(() => {
+    if (!result) return null;
+    return {
+      atk: Math.round(result.atk * slayerAtkMult),
+      hp: Math.round(result.hp * slayerHpMult),
+      dps: Math.round(result.dps * slayerAtkMult),
+      atkHits: result.atkHits.map((h) => Math.round(h * slayerAtkMult)),
+    };
+  }, [result, slayerAtkMult, slayerHpMult]);
+
+  // ダメージ補正を加味した対象別の実質値(属性超ダメのみ。特効はeffBaseに織込済)
   const effective = useMemo(() => {
-    if (!resolved || !result) return [];
-    return effectiveRows(
-      resolved,
-      { atk: result.atk, hp: result.hp, dps: result.dps, atkHits: result.atkHits },
-      treasure > 1 // お宝フル時は対属性お宝(超ダメ4倍等)も適用
-    );
-  }, [resolved, result, treasure]);
+    if (!resolved || !effBase) return [];
+    return effectiveRows(resolved, effBase, treasure > 1);
+  }, [resolved, effBase, treasure]);
 
   const strengthen = resolved?.strengthen ?? null;
   const crit = resolved?.crit ?? null;
@@ -264,22 +284,24 @@ export default function Calculator() {
   // splash込みの対象別総ダメージ(期待)。対象補正が無いキャラ(キャスリィ等)も
   // 「全般」1行で烈波込みの総ダメージを出す。
   const combinedRows = useMemo(() => {
-    if (!result || splash.length === 0) return [];
-    if (effective.length > 0) {
-      return effective.map((r) => ({
+    if (!effBase || splash.length === 0) return [];
+    const baseLabel = activeSlayerLabel || "全般";
+    const rows = [
+      {
+        label: baseLabel,
+        atk: Math.round(effBase.atk * splashMult),
+        dps: Math.round(effBase.dps * splashMult),
+      },
+    ];
+    for (const r of effective) {
+      rows.push({
         label: r.label,
         atk: Math.round(r.atk * splashMult),
         dps: Math.round(r.dps * splashMult),
-      }));
+      });
     }
-    return [
-      {
-        label: "全般(対象補正なし)",
-        atk: Math.round(result.atk * splashMult),
-        dps: Math.round(result.dps * splashMult),
-      },
-    ];
-  }, [effective, result, splash, splashMult]);
+    return rows;
+  }, [effective, effBase, activeSlayerLabel, splash, splashMult]);
 
   // 最大火力(全ダメージ上昇要素が同時発動した理論上限の1撃)。
   // 強化・対象倍率は全ダメージに乗算。渾身は直撃のみ、波動/烈波/爆破は別インスタンスのため
@@ -294,29 +316,32 @@ export default function Calculator() {
     return st * (sv + (splashHitMult - 1));
   }, [strengthen, savage, splashHitMult]);
   const maxRows = useMemo(() => {
-    if (!result || burstMult <= 1.0001) return [];
-    // 「全般(素×本能)」をベースに、対象補正(超ダメ/特効)は下の行に並べる
-    const rows = [{ label: "全般", atk: Math.round(result.atk * burstMult) }];
+    if (!effBase || burstMult <= 1.0001) return [];
+    // 特効込みのベースを先頭に、属性超ダメ行を下に
+    const rows = [
+      { label: activeSlayerLabel || "全般", atk: Math.round(effBase.atk * burstMult) },
+    ];
     for (const r of effective) {
       rows.push({ label: r.label, atk: Math.round(r.atk * burstMult) });
     }
     return rows;
-  }, [effective, result, burstMult]);
+  }, [effective, effBase, activeSlayerLabel, burstMult]);
 
-  // 実質ステータス表の表示行: 「全般(素×本能)」を先頭に、対象補正行(超ダメ/特効)を下に。
+  // 実質ステータス表の表示行: 特効込みベースを先頭に、属性超ダメ行を下に。
+  // 特効を持つキャラは属性超ダメが無くてもベース1行を出す(トグルで切替表示)。
   const effectiveDisplay = useMemo(() => {
-    if (!result || effective.length === 0) return [];
+    if (!effBase || (effective.length === 0 && slayers.length === 0)) return [];
     const base = {
-      label: "全般",
+      label: activeSlayerLabel || "全般",
       atkMult: 1,
       hpMult: 1,
-      atk: result.atk,
-      hp: result.hp,
-      dps: result.dps,
-      atkHits: result.atkHits,
+      atk: effBase.atk,
+      hp: effBase.hp,
+      dps: effBase.dps,
+      atkHits: effBase.atkHits,
     };
     return [base, ...effective];
-  }, [effective, result]);
+  }, [effective, effBase, slayers, activeSlayerLabel]);
 
   // 連続攻撃でヒットごとに射程が異なる場合の各ヒット射程帯
   const hitRanges = useMemo(() => (form ? activeHitRanges(form) : []), [form]);
@@ -570,7 +595,12 @@ export default function Calculator() {
           </section>
 
           {/* 実質ステータス(ダメージ補正込み) — メイン表示 */}
-          {(effective.length > 0 || strengthen || crit || savage || splash.length > 0) && (
+          {(effectiveDisplay.length > 0 ||
+            slayers.length > 0 ||
+            strengthen ||
+            crit ||
+            savage ||
+            splash.length > 0) && (
             <section className="rounded-2xl border border-sky-500/40 bg-gradient-to-b from-sky-500/[0.07] to-transparent p-4 shadow-lg shadow-sky-500/10 ring-1 ring-inset ring-sky-500/10">
               <h3 className="text-base font-bold text-sky-400">
                 実質ステータス
@@ -579,7 +609,34 @@ export default function Calculator() {
                   {plus > 0 && `+${plus}`}
                 </span>
               </h3>
-              {effective.length > 0 && (
+              {/* 特効on/offトグル(タップで全ステータスを一括切替) */}
+              {slayers.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] text-ink-dim">特効:</span>
+                  {slayers.map((s) => {
+                    const on = !slayerOff.has(s.key);
+                    return (
+                      <button
+                        key={s.key}
+                        onClick={() =>
+                          setSlayerOff((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(s.key)) next.delete(s.key);
+                            else next.add(s.key);
+                            return next;
+                          })
+                        }
+                        className={`rounded-full px-2.5 py-1 text-xs ${
+                          on ? "bg-brand/20 text-brand ring-1 ring-brand/40" : "bg-surface-2 text-ink-dim"
+                        }`}
+                      >
+                        {s.label}特効 ×{s.atkMult.toFixed(2).replace(/\.?0+$/, "")} {on ? "ON" : "OFF"}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {effectiveDisplay.length > 0 && (
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -707,14 +764,14 @@ export default function Calculator() {
                 </div>
               )}
 
-              {(strengthen || crit || savage) && result && (
+              {(strengthen || crit || savage) && effBase && (
                 <ul className="mt-3 space-y-1.5 text-xs text-ink">
                   {strengthen && (
                     <li>
                       ・攻撃力上昇: 体力{strengthen.threshold}%以下で攻撃力 ×
                       {strengthen.mult.toFixed(2)}(発動時 攻撃力{" "}
                       <span className="font-bold text-brand">
-                        {Math.round(result.atk * strengthen.mult).toLocaleString()}
+                        {Math.round(effBase.atk * strengthen.mult).toLocaleString()}
                       </span>
                       )
                     </li>
@@ -723,11 +780,11 @@ export default function Calculator() {
                     <li>
                       ・クリティカル: 発動率{crit.prob}% / 発動時 攻撃力{" "}
                       <span className="font-bold text-brand">
-                        ×2 = {Math.round(result.atk * crit.hitMult).toLocaleString()}
+                        ×2 = {Math.round(effBase.atk * crit.hitMult).toLocaleString()}
                       </span>{" "}
                       / 期待DPS ×{crit.expectedMult.toFixed(2)}(
                       <span className="font-bold text-brand">
-                        {Math.round(result.dps * crit.expectedMult).toLocaleString()}
+                        {Math.round(effBase.dps * crit.expectedMult).toLocaleString()}
                       </span>
                       )
                     </li>
@@ -737,11 +794,11 @@ export default function Calculator() {
                       ・渾身の一撃: 発動率{savage.prob}% / 威力+{savage.add}% / 発動時 攻撃力{" "}
                       <span className="font-bold text-brand">
                         ×{savage.hitMult.toFixed(2)} ={" "}
-                        {Math.round(result.atk * savage.hitMult).toLocaleString()}
+                        {Math.round(effBase.atk * savage.hitMult).toLocaleString()}
                       </span>{" "}
                       / 期待DPS ×{savage.expectedMult.toFixed(2)}(
                       <span className="font-bold text-brand">
-                        {Math.round(result.dps * savage.expectedMult).toLocaleString()}
+                        {Math.round(effBase.dps * savage.expectedMult).toLocaleString()}
                       </span>
                       )
                     </li>
@@ -793,7 +850,7 @@ export default function Calculator() {
                 ))
               ) : (
                 <ul className="mt-3 space-y-1">
-                  {result.atkHits.map((dmg, i) => (
+                  {(effBase?.atkHits ?? result.atkHits).map((dmg, i) => (
                     <li
                       key={i}
                       className="flex items-baseline justify-between border-b border-line/60 pb-1 text-sm last:border-0"
