@@ -214,21 +214,28 @@ export default function Calculator() {
       .filter((c): c is Cat => !!c);
   }, [cats, history]);
 
+  // 本能は第3形態(index 2)以降でのみ有効。第1・第2形態では本能なしで計算する
+  const talentsActive = formIdx >= 2;
+  const activeTalentLv = useMemo(
+    () => (talentsActive ? talentLv : []),
+    [talentsActive, talentLv]
+  );
+
   const result = useMemo(() => {
     if (!cat || !form) return null;
     return calcStats(cat, form, {
       level,
       plus,
       treasure,
-      talentLevels: talentLv,
+      talentLevels: activeTalentLv,
       combos: selectedCombos,
     });
-  }, [cat, form, level, plus, treasure, talentLv, selectedCombos]);
+  }, [cat, form, level, plus, treasure, activeTalentLv, selectedCombos]);
 
   // 本能・超本能による能力解放を反映した実効ステータス
   const resolved = useMemo(
-    () => (form ? resolveTalents(form, cat?.talents ?? null, talentLv) : null),
-    [form, cat, talentLv]
+    () => (form ? resolveTalents(form, cat?.talents ?? null, activeTalentLv) : null),
+    [form, cat, activeTalentLv]
   );
 
   // ダメージ補正を加味した対象別の実質値
@@ -759,8 +766,8 @@ export default function Calculator() {
             )}
           </section>
 
-          {/* 本能 */}
-          {cat.talents && (
+          {/* 本能(第3形態以降のみ) */}
+          {cat.talents && talentsActive && (
             <section className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-black/20">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold">本能</h3>
