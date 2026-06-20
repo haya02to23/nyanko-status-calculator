@@ -132,8 +132,8 @@ export default function Calculator() {
   const [comboQuery, setComboQuery] = useState("");
   const [comboOpen, setComboOpen] = useState(false);
   const [history, setHistory] = useState<number[]>([]);
-  // OFFにした特攻のkey集合(デフォルトは全ON=「全部盛り」)
-  const [slayerOff, setSlayerOff] = useState<Set<string>>(new Set());
+  // ONにした特攻のkey集合(デフォルトは空=全OFF。敵が該当種族の時だけタップでON)
+  const [slayerOn, setSlayerOn] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     Promise.all(
@@ -185,7 +185,7 @@ export default function Calculator() {
     setLevel(defaultLevelForForm(lastIdx, maxBase));
     setPlus(0);
     setTalentLv(c.talents ? c.talents.map((t) => t.maxLv) : []);
-    setSlayerOff(new Set());
+    setSlayerOn(new Set());
     setQuery("");
     // 検索履歴を更新(先頭に追加・重複除去・最大8件)
     setHistory((prev) => {
@@ -248,8 +248,8 @@ export default function Calculator() {
   // 特効/キラー(超獣・超生命体など)。on/offトグルで全ステータスに一括反映する。
   const slayers = useMemo(() => (resolved ? slayerGroupsOf(resolved) : []), [resolved]);
   const activeSlayers = useMemo(
-    () => slayers.filter((s) => !slayerOff.has(s.key)),
-    [slayers, slayerOff]
+    () => slayers.filter((s) => slayerOn.has(s.key)),
+    [slayers, slayerOn]
   );
   const slayerAtkMult = activeSlayers.reduce((m, s) => m * s.atkMult, 1);
   const slayerHpMult = activeSlayers.reduce((m, s) => m * s.hpMult, 1);
@@ -618,12 +618,12 @@ export default function Calculator() {
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] text-ink-dim">特効:</span>
                   {slayers.map((s) => {
-                    const on = !slayerOff.has(s.key);
+                    const on = slayerOn.has(s.key);
                     return (
                       <button
                         key={s.key}
                         onClick={() =>
-                          setSlayerOff((prev) => {
+                          setSlayerOn((prev) => {
                             const next = new Set(prev);
                             if (next.has(s.key)) next.delete(s.key);
                             else next.add(s.key);
