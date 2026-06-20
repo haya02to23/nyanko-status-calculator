@@ -83,18 +83,32 @@ function talentLabel(abilityId: number, textId: number, meta: Meta): string {
   return desc.split("<br>")[0] || `本能${abilityId}`;
 }
 
-// ユニットアイコン(public/icons/units/{id}.webp)。遅延読込で見えた分だけ取得。
-function UnitIcon({ id, className = "" }: { id: number; className?: string }) {
+// ユニットアイコン(public/icons/units/)。遅延読込で見えた分だけ取得。
+// form指定時は その形態の絵({id}-{form}.webp)。無ければ代表({id}.webp)にフォールバック。
+function UnitIcon({
+  id,
+  form,
+  className = "",
+}: {
+  id: number;
+  form?: number;
+  className?: string;
+}) {
+  const rep = `/icons/units/${id}.webp`;
+  const primary = form != null ? `/icons/units/${id}-${form}.webp` : rep;
   return (
     <img
-      src={`/icons/units/${id}.webp`}
+      key={primary}
+      src={primary}
       alt=""
       loading="lazy"
       width={104}
       height={79}
       className={`shrink-0 rounded-md bg-sunken object-contain ring-1 ring-line/60 ${className}`}
       onError={(e) => {
-        e.currentTarget.style.visibility = "hidden";
+        const img = e.currentTarget;
+        if (!img.src.endsWith(rep)) img.src = rep; // 形態別が無ければ代表へ
+        else img.style.visibility = "hidden"; // 代表も無ければ隠す
       }}
     />
   );
@@ -363,7 +377,7 @@ export default function Calculator() {
           {/* キャラヘッダ + 形態切替 */}
           <section className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-black/20">
             <div className="flex items-center gap-2.5">
-              <UnitIcon id={cat.id} className="h-11" />
+              <UnitIcon id={cat.id} form={formIdx} className="h-11" />
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span
@@ -382,12 +396,13 @@ export default function Calculator() {
                 <button
                   key={i}
                   onClick={() => selectForm(i)}
-                  className={`rounded-lg px-3 py-1.5 text-sm ${
+                  className={`flex items-center gap-1.5 rounded-lg py-1 pl-1 pr-2.5 text-sm ${
                     i === formIdx
                       ? "bg-brand font-bold text-bg"
                       : "bg-surface-2 text-ink hover:bg-surface-2"
                   }`}
                 >
+                  <UnitIcon id={cat.id} form={i} className="h-6" />
                   {["第1", "第2", "第3", "第4"][i]}形態
                 </button>
               ))}
