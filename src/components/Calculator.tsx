@@ -281,6 +281,27 @@ export default function Calculator() {
     ];
   }, [effective, result, splash, splashMult]);
 
+  // 最大火力(全ダメージ上昇要素が同時発動した理論上限の1撃)。
+  // 強化・対象倍率は全ダメージに乗算。渾身は直撃のみ、波動/烈波/爆破は別インスタンスのため
+  //   倍率 = 強化 ×(渾身発動倍率 + 波動烈波爆破の発動時加算)
+  const splashHitMult = useMemo(
+    () => splash.reduce((m, s) => m + s.hitMult, 1),
+    [splash]
+  );
+  const burstMult = useMemo(() => {
+    const st = strengthen?.mult ?? 1;
+    const sv = savage?.hitMult ?? 1;
+    return st * (sv + (splashHitMult - 1));
+  }, [strengthen, savage, splashHitMult]);
+  const maxRows = useMemo(() => {
+    if (!result || burstMult <= 1.0001) return [];
+    const base =
+      effective.length > 0
+        ? effective.map((r) => ({ label: r.label, atk: r.atk }))
+        : [{ label: "全般", atk: result.atk }];
+    return base.map((r) => ({ label: r.label, atk: Math.round(r.atk * burstMult) }));
+  }, [effective, result, burstMult]);
+
   // 連続攻撃でヒットごとに射程が異なる場合の各ヒット射程帯
   const hitRanges = useMemo(() => (form ? activeHitRanges(form) : []), [form]);
   const variedRanges = form ? hasVariedRanges(form) : false;
@@ -616,6 +637,56 @@ export default function Calculator() {
                   </table>
                   <p className="mt-1.5 text-[11px] text-ink-dim">
                     通常攻撃 + 波動/烈波/爆破の期待値(×{splashMult.toFixed(2)})に対象補正を掛けた総ダメージ。
+                  </p>
+                </div>
+              )}
+
+              {/* 最大火力(全ダメージ上昇要素が同時発動した理論上限) */}
+              {maxRows.length > 0 && (
+                <div className="mt-3 rounded-xl border border-brand/30 bg-brand/5 p-3">
+                  <p className="text-xs font-bold text-brand">
+                    最大火力(全強化・全発動時の理論値)
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-ink-dim">
+                    含む効果:{" "}
+                    {[
+                      strengthen &&
+                        `強化×${strengthen.mult.toFixed(2).replace(/\.?0+$/, "")}`,
+                      savage && `渾身×${savage.hitMult.toFixed(2).replace(/\.?0+$/, "")}`,
+                      splash.length > 0 &&
+                        `波動烈波爆破+${(splashHitMult - 1)
+                          .toFixed(2)
+                          .replace(/\.?0+$/, "")}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" / ")}{" "}
+                    → ×{burstMult.toFixed(2)}
+                  </p>
+                  <table className="mt-2 w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-ink-dim">
+                        <th className="py-1 text-left font-normal">対象</th>
+                        <th className="py-1 pl-4 text-right font-normal">最大ダメージ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {maxRows.map((r) => (
+                        <tr key={r.label}>
+                          <td className="py-1.5 pr-2 text-ink-dim">{r.label}</td>
+                          <td className="py-1.5 pl-4 text-right text-base font-bold tabular-nums text-brand">
+                            {r.atk.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {crit && (
+                    <p className="mt-1.5 text-[11px] text-ink-dim">
+                      ※対メタル時はクリティカル({crit.prob}%)発動で直撃がさらに×2。
+                    </p>
+                  )}
+                  <p className="mt-1 text-[11px] text-ink-dim">
+                    強化・渾身・波動/烈波/爆破が全て同時発動した1撃の理論最大。各効果は確率発動のため、実戦の平均は上の総ダメージ(期待値)を参照。
                   </p>
                 </div>
               )}
