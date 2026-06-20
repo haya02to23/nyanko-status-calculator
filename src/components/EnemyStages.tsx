@@ -9,13 +9,18 @@ type Enemy = {
   hp: number;
   atk: number;
   range: number;
+  speed: number;
+  kb: number;
+  money: number;
+  rangeType: string;
   traits: string[];
+  abilities: string[];
 };
 type Stage = {
   idx: number;
   name: string;
   hp: number;
-  enemies: [number, number][]; // [enemyId, hpMag%]
+  enemies: [number, number, number][]; // [enemyId, hpMag%, atkMag%]
 };
 type MapData = { id: number; grp: number; name: string; stages: Stage[] };
 
@@ -24,6 +29,78 @@ const norm = (s: string) =>
   s
     .toLowerCase()
     .replace(/[ぁ-ん]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
+
+// 敵の詳細(ステータス + 属性 + 能力)。倍率を渡すと実値表示。
+function EnemyDetail({
+  e,
+  hpMag,
+  atkMag,
+}: {
+  e: Enemy;
+  hpMag?: number;
+  atkMag?: number;
+}) {
+  const realHp = hpMag != null ? Math.round(e.hp * (hpMag / 100)) : e.hp;
+  const realAtk = atkMag != null ? Math.round(e.atk * (atkMag / 100)) : e.atk;
+  const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <div className="flex items-baseline justify-between gap-2 border-b border-line/50 py-1">
+      <span className="shrink-0 text-xs text-ink-dim">{label}</span>
+      <span className="text-right tabular-nums">{children}</span>
+    </div>
+  );
+  return (
+    <div className="mt-1 rounded-lg bg-sunken p-3">
+      <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+        <Row label="体力">
+          <span className="text-base font-bold text-sky-300">{realHp.toLocaleString()}</span>
+          {hpMag != null && hpMag !== 100 && (
+            <span className="ml-1 text-[11px] text-ink-dim">
+              ({e.hp.toLocaleString()}×{hpMag}%)
+            </span>
+          )}
+        </Row>
+        <Row label="攻撃力">
+          <span className="text-base font-bold text-sky-300">{realAtk.toLocaleString()}</span>
+          {atkMag != null && atkMag !== 100 && (
+            <span className="ml-1 text-[11px] text-ink-dim">
+              ({e.atk.toLocaleString()}×{atkMag}%)
+            </span>
+          )}
+        </Row>
+        <Row label="攻撃範囲">{e.rangeType}</Row>
+        <Row label="射程">{e.range}</Row>
+        <Row label="速度">{e.speed}</Row>
+        <Row label="ノックバック">{e.kb}回</Row>
+        <Row label="お金">{e.money.toLocaleString()}</Row>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1">
+        <span className="mr-1 text-xs text-ink-dim">属性:</span>
+        {e.traits.length > 0 ? (
+          e.traits.map((t) => (
+            <span key={t} className="rounded bg-surface-2 px-1.5 py-0.5 text-xs">
+              {t}
+            </span>
+          ))
+        ) : (
+          <span className="text-xs text-ink-dim">無属性</span>
+        )}
+      </div>
+      {e.abilities.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+          <span className="mr-1 text-xs text-ink-dim">特殊能力:</span>
+          {e.abilities.map((a) => (
+            <span
+              key={a}
+              className="rounded bg-brand/15 px-1.5 py-0.5 text-xs text-brand"
+            >
+              {a}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function EnemyStages() {
   const [enemies, setEnemies] = useState<Map<number, Enemy> | null>(null);
@@ -34,6 +111,7 @@ export default function EnemyStages() {
   const [query, setQuery] = useState("");
   const [openMapId, setOpenMapId] = useState<number | null>(null);
   const [openStageIdx, setOpenStageIdx] = useState<number | null>(null);
+  const [openEnemyKey, setOpenEnemyKey] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -53,7 +131,6 @@ export default function EnemyStages() {
       .catch(() => setLoadError(true));
   }, []);
 
-  // ステージ検索: マップ名 or ステージ名にマッチ
   const mapResults = useMemo(() => {
     if (!maps) return [];
     const q = norm(query.trim());
@@ -68,37 +145,36 @@ export default function EnemyStages() {
     return out;
   }, [maps, query]);
 
-  // 敵検索: 名前マッチ
   const enemyResults = useMemo(() => {
     if (!enemies) return [];
     const q = norm(query.trim());
-    const all = [...enemies.values()];
     if (!q) return [];
-    return all.filter((e) => e.name && norm(e.name).includes(q)).slice(0, 60);
+    return [...enemies.values()]
+      .filter((e) => e.name && norm(e.name).includes(q))
+      .slice(0, 60);
   }, [enemies, query]);
 
-  const openMap = maps?.find((m) => m.id === openMapId) ?? null;
-
-  // ステージ内の敵を実HP込みで整形(実HP降順=強い敵が上)
+  // ステージ内の敵を実HP込みで整形(実HP降順、同一敵+倍率はまとめ)
   const stageEnemyRows = (st: Stage) => {
     if (!enemies) return [];
-    const rows = st.enemies.map(([eid, mag]) => {
+    const merged = new Map<
+      string,
+      { e: Enemy; hpMag: number; atkMag: number; real: number; count: number }
+    >();
+    for (const [eid, hpMag, atkMag] of st.enemies) {
       const e = enemies.get(eid);
-      return {
-        name: e?.name ?? `敵${eid}`,
-        traits: e?.traits ?? [],
-        base: e?.hp ?? 0,
-        mag,
-        real: Math.round((e?.hp ?? 0) * (mag / 100)),
-      };
-    });
-    // 同一敵の重複をまとめる(名前+倍率が同じ → 体数表示)
-    const merged = new Map<string, (typeof rows)[number] & { count: number }>();
-    for (const r of rows) {
-      const key = `${r.name}@${r.mag}`;
+      if (!e) continue;
+      const key = `${eid}@${hpMag}@${atkMag}`;
       const cur = merged.get(key);
       if (cur) cur.count++;
-      else merged.set(key, { ...r, count: 1 });
+      else
+        merged.set(key, {
+          e,
+          hpMag,
+          atkMag,
+          real: Math.round(e.hp * (hpMag / 100)),
+          count: 1,
+        });
     }
     return [...merged.values()].sort((a, b) => b.real - a.real);
   };
@@ -106,9 +182,9 @@ export default function EnemyStages() {
   const stageMaxHp = (st: Stage) => {
     if (!enemies) return 0;
     let mx = 0;
-    for (const [eid, mag] of st.enemies) {
+    for (const [eid, hpMag] of st.enemies) {
       const e = enemies.get(eid);
-      if (e) mx = Math.max(mx, Math.round(e.hp * (mag / 100)));
+      if (e) mx = Math.max(mx, Math.round(e.hp * (hpMag / 100)));
     }
     return mx;
   };
@@ -121,7 +197,7 @@ export default function EnemyStages() {
         </span>
         <div>
           <h1 className="text-lg font-bold tracking-tight text-ink">敵・ステージ図鑑</h1>
-          <p className="text-[11px] text-ink-dim">ステージに出る敵の倍率・実HPを確認</p>
+          <p className="text-[11px] text-ink-dim">ステージに出る敵の倍率・実HP・能力を確認</p>
         </div>
       </Link>
       <Link
@@ -161,6 +237,7 @@ export default function EnemyStages() {
                 setTab(t);
                 setOpenMapId(null);
                 setOpenStageIdx(null);
+                setOpenEnemyKey(null);
               }}
               className={`rounded-lg px-3 py-1.5 text-sm ${
                 tab === t ? "bg-brand font-bold text-bg" : "bg-surface-2 text-ink"
@@ -192,6 +269,7 @@ export default function EnemyStages() {
                   onClick={() => {
                     setOpenMapId(openMapId === m.id ? null : m.id);
                     setOpenStageIdx(null);
+                    setOpenEnemyKey(null);
                   }}
                   className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-surface-2"
                 >
@@ -204,9 +282,10 @@ export default function EnemyStages() {
                     {m.stages.map((st) => (
                       <li key={st.idx} className="border-b border-line/60 last:border-0">
                         <button
-                          onClick={() =>
-                            setOpenStageIdx(openStageIdx === st.idx ? null : st.idx)
-                          }
+                          onClick={() => {
+                            setOpenStageIdx(openStageIdx === st.idx ? null : st.idx);
+                            setOpenEnemyKey(null);
+                          }}
                           className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-surface-2"
                         >
                           <span>{st.name}</span>
@@ -218,48 +297,48 @@ export default function EnemyStages() {
                           </span>
                         </button>
                         {openStageIdx === st.idx && (
-                          <div className="bg-sunken px-4 py-2">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="text-xs text-ink-dim">
-                                  <th className="py-1 text-left font-normal">敵</th>
-                                  <th className="py-1 pl-2 text-right font-normal">基礎HP</th>
-                                  <th className="py-1 pl-2 text-right font-normal">倍率</th>
-                                  <th className="py-1 pl-2 text-right font-normal">実HP</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-line">
-                                {stageEnemyRows(st).map((r, i) => (
-                                  <tr key={i}>
-                                    <td className="py-1.5 pr-2">
-                                      {r.name}
-                                      {r.count > 1 && (
-                                        <span className="ml-1 text-xs text-ink-dim">
-                                          ×{r.count}
-                                        </span>
-                                      )}
-                                      {r.traits.length > 0 && (
-                                        <span className="ml-1 text-[10px] text-ink-dim">
-                                          [{r.traits.join("")}]
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="py-1.5 pl-2 text-right tabular-nums text-ink-dim">
-                                      {r.base.toLocaleString()}
-                                    </td>
-                                    <td className="py-1.5 pl-2 text-right tabular-nums">
-                                      {r.mag}%
-                                    </td>
-                                    <td className="py-1.5 pl-2 text-right text-base font-bold tabular-nums text-sky-300">
-                                      {r.real.toLocaleString()}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                            <p className="mt-1 text-[10px] text-ink-dim">
-                              実HP = 基礎HP × 倍率（★無し基準）。城HP {st.hp.toLocaleString()}。
+                          <div className="bg-sunken/60 px-3 py-2">
+                            <p className="mb-1 text-[10px] text-ink-dim">
+                              敵をタップで詳細。実HP=基礎HP×倍率（★無し基準）。城HP{" "}
+                              {st.hp.toLocaleString()}。
                             </p>
+                            <ul className="space-y-1">
+                              {stageEnemyRows(st).map((r) => {
+                                const key = `${st.idx}#${r.e.id}@${r.hpMag}@${r.atkMag}`;
+                                const open = openEnemyKey === key;
+                                return (
+                                  <li key={key}>
+                                    <button
+                                      onClick={() => setOpenEnemyKey(open ? null : key)}
+                                      className="flex w-full items-baseline gap-2 rounded-md px-1 py-1 text-left text-sm hover:bg-surface-2"
+                                    >
+                                      <span>
+                                        {r.e.name}
+                                        {r.count > 1 && (
+                                          <span className="ml-1 text-xs text-ink-dim">
+                                            ×{r.count}
+                                          </span>
+                                        )}
+                                        {r.e.traits.length > 0 && (
+                                          <span className="ml-1 text-[10px] text-ink-dim">
+                                            [{r.e.traits.join("")}]
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span className="ml-auto text-xs text-ink-dim">
+                                        ×{r.hpMag}%
+                                      </span>
+                                      <span className="w-24 text-right text-base font-bold tabular-nums text-sky-300">
+                                        {r.real.toLocaleString()}
+                                      </span>
+                                    </button>
+                                    {open && (
+                                      <EnemyDetail e={r.e} hpMag={r.hpMag} atkMag={r.atkMag} />
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
                           </div>
                         )}
                       </li>
@@ -276,48 +355,38 @@ export default function EnemyStages() {
 
         {/* 敵タブ */}
         {tab === "enemy" && (
-          <div className="mt-3 overflow-x-auto">
+          <div className="mt-3 space-y-1.5">
             {!query && (
               <p className="py-8 text-center text-ink-dim">敵の名前を入力してください。</p>
             )}
             {query && enemyResults.length === 0 && (
               <p className="py-8 text-center text-ink-dim">該当する敵がいません。</p>
             )}
-            {enemyResults.length > 0 && (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-ink-dim">
-                    <th className="py-1 text-left font-normal">敵</th>
-                    <th className="py-1 pl-2 text-right font-normal">基礎HP</th>
-                    <th className="py-1 pl-2 text-right font-normal">攻撃力</th>
-                    <th className="py-1 pl-2 text-right font-normal">射程</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {enemyResults.map((e) => (
-                    <tr key={e.id}>
-                      <td className="py-1.5 pr-2">
-                        {e.name}
-                        {e.traits.length > 0 && (
-                          <span className="ml-1 text-[10px] text-ink-dim">
-                            [{e.traits.join("")}]
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-1.5 pl-2 text-right text-base font-bold tabular-nums text-sky-300">
-                        {e.hp.toLocaleString()}
-                      </td>
-                      <td className="py-1.5 pl-2 text-right tabular-nums">
-                        {e.atk.toLocaleString()}
-                      </td>
-                      <td className="py-1.5 pl-2 text-right tabular-nums text-ink-dim">
-                        {e.range}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+            {enemyResults.map((e) => {
+              const open = openEnemyKey === `e${e.id}`;
+              return (
+                <div key={e.id} className="overflow-hidden rounded-xl border border-line bg-surface">
+                  <button
+                    onClick={() => setOpenEnemyKey(open ? null : `e${e.id}`)}
+                    className="flex w-full items-baseline gap-2 px-4 py-2.5 text-left hover:bg-surface-2"
+                  >
+                    <span className="font-bold">{e.name}</span>
+                    {e.traits.length > 0 && (
+                      <span className="text-[10px] text-ink-dim">[{e.traits.join("")}]</span>
+                    )}
+                    <span className="ml-auto text-xs text-ink-dim">
+                      HP{" "}
+                      <span className="font-bold text-sky-300">{e.hp.toLocaleString()}</span>
+                    </span>
+                  </button>
+                  {open && (
+                    <div className="px-4 pb-3">
+                      <EnemyDetail e={e} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

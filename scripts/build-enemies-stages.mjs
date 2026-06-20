@@ -34,13 +34,57 @@ const TRAIT_BITS = [
 const traitsOf = (mask) =>
   TRAIT_BITS.filter((_, b) => mask & (1 << b));
 
+// 能力ID(battlecatsinfo unit.mjs の AB_* 準拠) → 日本語名。enemy.json の e.ab を解析。
+const AB_NAME = {
+  1: "強化", 2: "生き残る", 4: "クリティカル", 7: "バリア割り", 8: "シールド貫通",
+  9: "渾身の一撃", 10: "お金アップ", 11: "メタル", 12: "小波動", 13: "波動",
+  14: "小烈波", 15: "烈波", 16: "波動ストッパー", 21: "攻撃力ダウン", 22: "動きを止める",
+  23: "動きを遅くする", 30: "ふっとばす", 31: "ワープ", 33: "呪い", 34: "もぐる",
+  35: "復活", 36: "毒撃", 37: "自爆", 38: "バリア", 39: "悪魔シールド", 40: "反撃",
+  41: "死後烈波", 43: "取り巻き", 45: "爆波", 47: "ドレイン",
+};
+// 無効(imu)ビット順(units_scheme immunes と同順)
+const IMU_NAME = [
+  "波動", "停止", "遅化", "ふっとばし", "烈波", "攻撃力ダウン",
+  "ワープ", "古代の呪い", "毒撃", "魔王震波", "爆波",
+];
+function abilitiesOf(e) {
+  const out = [];
+  const ab = e.ab || {};
+  for (const k in ab) {
+    const id = +k;
+    const name = AB_NAME[id];
+    if (!name) continue;
+    const p = ab[k];
+    let label = name;
+    if (Array.isArray(p) && p.length) {
+      if (id === 13 || id === 12) label = `${name} Lv${p[1] ?? ""} ${p[0]}%`.trim();
+      else if (id === 15 || id === 14) label = `${name} Lv${p[3] ?? p[p.length - 1]} ${p[0]}%`.trim();
+      else if (id === 38) label = `${name} ${p[0]}`; // バリアHP
+      else if (typeof p[0] === "number") label = `${name} ${p[0]}%`;
+    }
+    out.push(label);
+  }
+  const imuList = IMU_NAME.filter((_, b) => (e.imu || 0) & (1 << b));
+  if (imuList.length) out.push(`無効: ${imuList.join("・")}`);
+  return out;
+}
+// atkType ビット: 単体1 / 範囲2 / 遠方4 / 全方位8
+const rangeTypeOf = (t) =>
+  t & 8 ? "全方位" : t & 4 ? "遠方" : t & 2 ? "範囲" : "単体";
+
 const enemies = enemyRaw.map((e) => ({
   id: e.i,
   name: e.jp_name || e.name,
   hp: e.hp,
-  atk: e.atk,
+  atk: (e.atk || 0) + (e.atk1 || 0) + (e.atk2 || 0), // 多段は合計
   range: e.range,
+  speed: e.speed,
+  kb: e.kb,
+  money: e.earn,
+  rangeType: rangeTypeOf(e.atkType || 0),
   traits: traitsOf(e.trait || 0),
+  abilities: abilitiesOf(e),
 }));
 
 // ── 2) ステージ + マップ ───────────────────────────────────────
@@ -70,8 +114,8 @@ for (const key in stageData) {
     const A = line.split(",");
     const eid = parseInt(A[0], 36);
     if (Number.isNaN(eid)) continue; // "l"等の特殊行を除外
-    const [hpMag] = decodeMag(A[7]);
-    enemyList.push([eid, hpMag]);
+    const [hpMag, atkMag] = decodeMag(A[7]);
+    enemyList.push([eid, hpMag, atkMag]);
   }
   if (enemyList.length === 0) continue;
 
