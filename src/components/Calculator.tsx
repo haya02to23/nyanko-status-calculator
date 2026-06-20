@@ -305,21 +305,71 @@ export default function Calculator() {
     });
   }, [combosAll, meta, comboQuery]);
 
+  // ヘッダー(クリックでホーム=未選択状態に戻る)
+  const goHome = () => {
+    setSelId(null);
+    setQuery("");
+    setComboIds([]);
+    setComboQuery("");
+    setComboOpen(false);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0 });
+  };
+  const header = (
+    <header className="mx-auto max-w-3xl px-4 pt-7 pb-1">
+      <button
+        onClick={goHome}
+        aria-label="ホームに戻る"
+        className="flex items-center gap-2.5 text-left transition-opacity hover:opacity-80"
+      >
+        <span
+          aria-hidden
+          className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl"
+        >
+          <img
+            src="/icon/icon_ver2.PNG"
+            alt=""
+            width={36}
+            height={36}
+            className="object-cover"
+          />
+        </span>
+        <div>
+          <h1 className="text-lg font-bold tracking-tight text-ink">
+            にゃんこステータス計算機
+          </h1>
+          <p className="text-[11px] text-ink-dim">
+            レベル・本能・にゃんコンボ・ダメージ補正込みの実質ステータス
+          </p>
+        </div>
+      </button>
+    </header>
+  );
+
   if (loadError)
     return (
-      <p className="p-8 text-center text-red-400">
-        データの読み込みに失敗しました。再読み込みしてください。
-      </p>
+      <>
+        {header}
+        <p className="p-8 text-center text-red-400">
+          データの読み込みに失敗しました。再読み込みしてください。
+        </p>
+      </>
     );
   if (!cats || !combosAll || !meta)
-    return <p className="p-8 text-center text-ink-dim animate-pulse">データ読み込み中…</p>;
+    return (
+      <>
+        {header}
+        <p className="p-8 text-center text-ink-dim animate-pulse">データ読み込み中…</p>
+      </>
+    );
 
   const maxBase = cat ? cat.maxBase || 60 : 60;
   const maxPlus = cat ? cat.maxPlus : 0;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 pb-24">
-      {/* 検索 */}
+    <>
+      {header}
+      <div className="mx-auto max-w-3xl px-4 pb-24">
+        {/* 検索 */}
       <div className="sticky top-0 z-20 -mx-4 bg-sunken/95 px-4 pb-2 pt-3 backdrop-blur">
         <input
           value={query}
@@ -924,6 +974,7 @@ export default function Calculator() {
           </section>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
