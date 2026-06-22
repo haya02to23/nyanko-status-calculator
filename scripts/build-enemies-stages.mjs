@@ -100,6 +100,12 @@ function decodeMag(tok) {
   return [d36(d || "2s"), d36(r || "2s")];
 }
 
+// 敵id→属性 と uber(超系)判定
+const traitsById = new Map(enemies.map((e) => [e.id, e.traits]));
+const UBER = ["超生命体", "超賢者", "超獣"];
+const hasUber = (eid) => (traitsById.get(eid) || []).some((t) => UBER.includes(t));
+const hasColossus = (eid) => (traitsById.get(eid) || []).includes("超生命体");
+
 // stageId = mapId*1000 + stageIndex、 mapId = grp*1000 + mapIndex
 const maps = new Map();
 for (const key in stageData) {
@@ -110,12 +116,19 @@ for (const key in stageData) {
   const stageIdx = sid % 1000;
 
   const enemyList = [];
+  let colossus = false;
+  let bossName = null; // 魔王旗付き かつ 超系の敵名(=ボス章の目印)
   for (const line of st.enemyLines.split("|")) {
     const A = line.split(",");
     const eid = parseInt(A[0], 36);
     if (Number.isNaN(eid)) continue; // "l"等の特殊行を除外
     const [hpMag, atkMag] = decodeMag(A[7]);
     enemyList.push([eid, hpMag, atkMag]);
+    if (hasColossus(eid)) colossus = true;
+    const isBoss = A[6] && A[6][0] === "2"; // 魔王(ボス)旗
+    if (isBoss && hasUber(eid) && !bossName) {
+      bossName = enemies.find((e) => e.id === eid)?.name ?? null;
+    }
   }
   if (enemyList.length === 0) continue;
 
@@ -126,9 +139,14 @@ for (const key in stageData) {
       grp: Math.floor(mapId / 1000),
       name: m?.nameJp || m?.name || `マップ${mapId}`,
       stages: [],
+      colossus: false, // 超生命体の敵が出る(超生命体強襲の判定)
+      bossName: null, // 超系のボス(ソラクティス等)がいる章の目印
     });
   }
-  maps.get(mapId).stages.push({
+  const mp = maps.get(mapId);
+  if (colossus) mp.colossus = true;
+  if (bossName && !mp.bossName) mp.bossName = bossName;
+  mp.stages.push({
     idx: stageIdx,
     name: st.nameJp || st.name || `ステージ${stageIdx}`,
     hp: st.hp, // 拠点(城)HP

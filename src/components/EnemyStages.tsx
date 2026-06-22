@@ -22,7 +22,14 @@ type Stage = {
   hp: number;
   enemies: [number, number, number][]; // [enemyId, hpMag%, atkMag%]
 };
-type MapData = { id: number; grp: number; name: string; stages: Stage[] };
+type MapData = {
+  id: number;
+  grp: number;
+  name: string;
+  stages: Stage[];
+  colossus?: boolean; // 超生命体の敵が出る
+  bossName?: string | null; // 超系ボス(ソラクティス等)がいる章
+};
 
 // ひらがな→カタカナにして大文字小文字を無視した検索キー
 const norm = (s: string) =>
@@ -36,9 +43,16 @@ const norm = (s: string) =>
 // 11=強襲, 14=超獣討伐。降臨はgrpに無く名前で抽出。
 type HomeCat = { key: string; label: string; grp?: number; filter?: (m: MapData) => boolean };
 const HOME_CATEGORIES: HomeCat[] = [
-  { key: "advent", label: "降臨ステージ", filter: (m) => /降臨/.test(m.name) && m.grp !== 2 && m.grp !== 13 },
-  { key: "g11", label: "強襲ステージ", grp: 11 },
+  {
+    key: "advent",
+    label: "降臨ステージ",
+    filter: (m) => /降臨/.test(m.name) && !/大狂乱/.test(m.name) && m.grp !== 2 && m.grp !== 13,
+  },
+  { key: "manic", label: "大狂乱降臨", filter: (m) => /大狂乱/.test(m.name) },
+  { key: "g11", label: "強襲ステージ", filter: (m) => m.grp === 11 && !m.colossus },
+  { key: "colossus", label: "超生命体強襲", filter: (m) => m.grp === 11 && !!m.colossus },
   { key: "g14", label: "超獣討伐ステージ", grp: 14 },
+  { key: "g12", label: "発掘ステージ", grp: 12 },
   { key: "g16", label: "ゼロレジェンド", grp: 16 },
   { key: "g9", label: "真レジェンド", grp: 9 },
   { key: "g0", label: "旧レジェンド（ストーリーズ オブ レジェンド）", grp: 0 },
@@ -249,7 +263,12 @@ export default function EnemyStages() {
 
   // 1マップ分(展開でステージ→敵)。検索結果とカテゴリ両方で再利用。
   const renderMap = (m: MapData) => (
-    <div key={m.id} className="overflow-hidden rounded-xl border border-line bg-surface">
+    <div
+      key={m.id}
+      className={`overflow-hidden rounded-xl border bg-surface ${
+        m.bossName ? "border-amber-400/60 ring-1 ring-amber-400/30" : "border-line"
+      }`}
+    >
       <button
         onClick={() => {
           setOpenMapId(openMapId === m.id ? null : m.id);
@@ -258,7 +277,12 @@ export default function EnemyStages() {
         }}
         className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-surface-2"
       >
-        <span className="font-bold">{m.name}</span>
+        <span className={`font-bold ${m.bossName ? "text-amber-300" : ""}`}>{m.name}</span>
+        {m.bossName && (
+          <span className="rounded bg-amber-400/15 px-1.5 py-0.5 text-[10px] text-amber-300">
+            👑 {m.bossName}
+          </span>
+        )}
         <span className="text-xs text-ink-dim">{m.stages.length}ステージ</span>
         <span className="ml-auto text-ink-dim">{openMapId === m.id ? "▲" : "▼"}</span>
       </button>
