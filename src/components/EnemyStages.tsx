@@ -30,28 +30,18 @@ const norm = (s: string) =>
     .toLowerCase()
     .replace(/[ぁ-ん]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
 
-// マップのカテゴリ(grp=floor(mapId/1000))。newest=true は新着順(id降順)で並べる。
-// 上から表示順。レジェンド(イベント)を先頭・新着順にして「今のイベント」を頭出し。
-const CATEGORIES: { grp: number; label: string; newest: boolean }[] = [
-  { grp: 2, label: "レジェンドステージ", newest: true },
-  { grp: 13, label: "強襲ステージ", newest: true },
-  { grp: 9, label: "真レジェンド", newest: true },
-  { grp: 16, label: "ゼロレジェンド", newest: true },
-  { grp: 4, label: "進化素材ステージ", newest: true },
-  { grp: 10, label: "マタタビステージ", newest: true },
-  { grp: 11, label: "強襲・イベント(旧)", newest: true },
-  { grp: 12, label: "古戦場・その他イベント", newest: true },
-  { grp: 3, label: "メインストーリー(EOC/未来/宇宙)", newest: false },
-  { grp: 0, label: "EOC・伝説", newest: false },
-  { grp: 1, label: "曜日ステージ・イベント", newest: true },
-  { grp: 6, label: "にゃんこ塔", newest: false },
-  { grp: 7, label: "ランキングの間(殿堂)", newest: true },
-  { grp: 17, label: "異次元コロシアム", newest: false },
-  { grp: 18, label: "にゃんこ道検定", newest: false },
-  { grp: 5, label: "修行(初心/ニコニコの間)", newest: false },
-  { grp: 8, label: "チャレンジバトル", newest: false },
-  { grp: 14, label: "ガープラ密林ほか", newest: false },
-  { grp: 15, label: "グランドアビス", newest: false },
+// ホームに出すカテゴリ。常設イベント(降臨/強襲等)とレジェンドストーリー(ゼロ→真→旧)。
+// 期間限定コラボ(grp2/13)やストーリー等は出さず検索のみ。すべて新着順(id降順)。
+// grpName(battlecatsinfo公式)準拠: grp0=旧レジェンド, 9=真レジェンド, 16=ゼロレジェンド,
+// 11=強襲, 14=超獣討伐。降臨はgrpに無く名前で抽出。
+type HomeCat = { key: string; label: string; grp?: number; filter?: (m: MapData) => boolean };
+const HOME_CATEGORIES: HomeCat[] = [
+  { key: "advent", label: "降臨ステージ", filter: (m) => /降臨/.test(m.name) && m.grp !== 2 && m.grp !== 13 },
+  { key: "g11", label: "強襲ステージ", grp: 11 },
+  { key: "g14", label: "超獣討伐ステージ", grp: 14 },
+  { key: "g16", label: "ゼロレジェンド", grp: 16 },
+  { key: "g9", label: "真レジェンド", grp: 9 },
+  { key: "g0", label: "旧レジェンド（ストーリーズ オブ レジェンド）", grp: 0 },
 ];
 
 // 敵アイコン(public/icons/enemies/{id}.webp)。遅延読込・無ければ非表示。
@@ -164,7 +154,7 @@ export default function EnemyStages() {
 
   const [tab, setTab] = useState<"stage" | "enemy">("stage");
   const [query, setQuery] = useState("");
-  const [openCategory, setOpenCategory] = useState<number | null>(2); // 既定でレジェンド展開
+  const [openCategory, setOpenCategory] = useState<string | null>("advent"); // 既定で降臨展開
   const [openMapId, setOpenMapId] = useState<number | null>(null);
   const [openStageIdx, setOpenStageIdx] = useState<number | null>(null);
   const [openEnemyKey, setOpenEnemyKey] = useState<string | null>(null);
@@ -202,27 +192,15 @@ export default function EnemyStages() {
     return out;
   }, [maps, query]);
 
-  // カテゴリ別(検索していない時のホーム表示)。レジェンドは新着順。
+  // ホーム表示(検索なし)のカテゴリ。常設イベント+レジェンドストーリー、各新着順(id降順)。
   const categorized = useMemo(() => {
     if (!maps) return [];
-    const byGrp = new Map<number, MapData[]>();
-    for (const m of maps) {
-      const arr = byGrp.get(m.grp);
-      if (arr) arr.push(m);
-      else byGrp.set(m.grp, [m]);
-    }
-    const known = new Set(CATEGORIES.map((c) => c.grp));
-    const out = CATEGORIES.filter((c) => byGrp.has(c.grp)).map((c) => ({
-      grp: c.grp,
-      label: c.label,
-      maps: [...byGrp.get(c.grp)!].sort((a, b) => (c.newest ? b.id - a.id : a.id - b.id)),
-    }));
-    // 未分類のgrpは「その他」にまとめて末尾へ
-    const rest: MapData[] = [];
-    for (const [g, arr] of byGrp) if (!known.has(g)) rest.push(...arr);
-    if (rest.length)
-      out.push({ grp: -1, label: "その他", maps: rest.sort((a, b) => b.id - a.id) });
-    return out;
+    return HOME_CATEGORIES.map((c) => {
+      const ms = maps
+        .filter((m) => (c.grp != null ? m.grp === c.grp : c.filter!(m)))
+        .sort((a, b) => b.id - a.id);
+      return { key: c.key, label: c.label, maps: ms };
+    }).filter((c) => c.maps.length > 0);
   }, [maps]);
 
   const enemyResults = useMemo(() => {
@@ -446,12 +424,12 @@ export default function EnemyStages() {
                 </a>
                 {categorized.map((cat) => (
                   <div
-                    key={cat.grp}
+                    key={cat.key}
                     className="overflow-hidden rounded-xl border border-line bg-surface"
                   >
                     <button
                       onClick={() => {
-                        setOpenCategory(openCategory === cat.grp ? null : cat.grp);
+                        setOpenCategory(openCategory === cat.key ? null : cat.key);
                         setOpenMapId(null);
                         setOpenStageIdx(null);
                       }}
@@ -460,10 +438,10 @@ export default function EnemyStages() {
                       <span className="font-bold">{cat.label}</span>
                       <span className="text-xs text-ink-dim">{cat.maps.length}マップ</span>
                       <span className="ml-auto text-ink-dim">
-                        {openCategory === cat.grp ? "▲" : "▼"}
+                        {openCategory === cat.key ? "▲" : "▼"}
                       </span>
                     </button>
-                    {openCategory === cat.grp && (
+                    {openCategory === cat.key && (
                       <div className="space-y-1.5 border-t border-line bg-sunken/40 p-2">
                         {cat.maps.map(renderMap)}
                       </div>
