@@ -30,6 +30,30 @@ const norm = (s: string) =>
     .toLowerCase()
     .replace(/[ぁ-ん]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60));
 
+// マップのカテゴリ(grp=floor(mapId/1000))。newest=true は新着順(id降順)で並べる。
+// 上から表示順。レジェンド(イベント)を先頭・新着順にして「今のイベント」を頭出し。
+const CATEGORIES: { grp: number; label: string; newest: boolean }[] = [
+  { grp: 2, label: "レジェンドステージ", newest: true },
+  { grp: 13, label: "強襲ステージ", newest: true },
+  { grp: 9, label: "真レジェンド", newest: true },
+  { grp: 16, label: "ゼロレジェンド", newest: true },
+  { grp: 4, label: "進化素材ステージ", newest: true },
+  { grp: 10, label: "マタタビステージ", newest: true },
+  { grp: 11, label: "強襲・イベント(旧)", newest: true },
+  { grp: 12, label: "古戦場・その他イベント", newest: true },
+  { grp: 3, label: "メインストーリー(EOC/未来/宇宙)", newest: false },
+  { grp: 0, label: "EOC・伝説", newest: false },
+  { grp: 1, label: "曜日ステージ・イベント", newest: true },
+  { grp: 6, label: "にゃんこ塔", newest: false },
+  { grp: 7, label: "ランキングの間(殿堂)", newest: true },
+  { grp: 17, label: "異次元コロシアム", newest: false },
+  { grp: 18, label: "にゃんこ道検定", newest: false },
+  { grp: 5, label: "修行(初心/ニコニコの間)", newest: false },
+  { grp: 8, label: "チャレンジバトル", newest: false },
+  { grp: 14, label: "ガープラ密林ほか", newest: false },
+  { grp: 15, label: "グランドアビス", newest: false },
+];
+
 // 敵アイコン(public/icons/enemies/{id}.webp)。遅延読込・無ければ非表示。
 function EnemyIcon({ id, className = "" }: { id: number; className?: string }) {
   return (
@@ -140,6 +164,7 @@ export default function EnemyStages() {
 
   const [tab, setTab] = useState<"stage" | "enemy">("stage");
   const [query, setQuery] = useState("");
+  const [openCategory, setOpenCategory] = useState<number | null>(2); // 既定でレジェンド展開
   const [openMapId, setOpenMapId] = useState<number | null>(null);
   const [openStageIdx, setOpenStageIdx] = useState<number | null>(null);
   const [openEnemyKey, setOpenEnemyKey] = useState<string | null>(null);
@@ -162,10 +187,11 @@ export default function EnemyStages() {
       .catch(() => setLoadError(true));
   }, []);
 
+  // 検索結果(マップ名 or ステージ名にマッチ)
   const mapResults = useMemo(() => {
     if (!maps) return [];
     const q = norm(query.trim());
-    if (!q) return maps.slice(0, 60);
+    if (!q) return [];
     const out: MapData[] = [];
     for (const m of maps) {
       if (norm(m.name).includes(q) || m.stages.some((s) => norm(s.name).includes(q))) {
@@ -175,6 +201,29 @@ export default function EnemyStages() {
     }
     return out;
   }, [maps, query]);
+
+  // カテゴリ別(検索していない時のホーム表示)。レジェンドは新着順。
+  const categorized = useMemo(() => {
+    if (!maps) return [];
+    const byGrp = new Map<number, MapData[]>();
+    for (const m of maps) {
+      const arr = byGrp.get(m.grp);
+      if (arr) arr.push(m);
+      else byGrp.set(m.grp, [m]);
+    }
+    const known = new Set(CATEGORIES.map((c) => c.grp));
+    const out = CATEGORIES.filter((c) => byGrp.has(c.grp)).map((c) => ({
+      grp: c.grp,
+      label: c.label,
+      maps: [...byGrp.get(c.grp)!].sort((a, b) => (c.newest ? b.id - a.id : a.id - b.id)),
+    }));
+    // 未分類のgrpは「その他」にまとめて末尾へ
+    const rest: MapData[] = [];
+    for (const [g, arr] of byGrp) if (!known.has(g)) rest.push(...arr);
+    if (rest.length)
+      out.push({ grp: -1, label: "その他", maps: rest.sort((a, b) => b.id - a.id) });
+    return out;
+  }, [maps]);
 
   const enemyResults = useMemo(() => {
     if (!enemies) return [];
@@ -219,6 +268,87 @@ export default function EnemyStages() {
     }
     return mx;
   };
+
+  // 1マップ分(展開でステージ→敵)。検索結果とカテゴリ両方で再利用。
+  const renderMap = (m: MapData) => (
+    <div key={m.id} className="overflow-hidden rounded-xl border border-line bg-surface">
+      <button
+        onClick={() => {
+          setOpenMapId(openMapId === m.id ? null : m.id);
+          setOpenStageIdx(null);
+          setOpenEnemyKey(null);
+        }}
+        className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-surface-2"
+      >
+        <span className="font-bold">{m.name}</span>
+        <span className="text-xs text-ink-dim">{m.stages.length}ステージ</span>
+        <span className="ml-auto text-ink-dim">{openMapId === m.id ? "▲" : "▼"}</span>
+      </button>
+      {openMapId === m.id && (
+        <ul className="border-t border-line">
+          {m.stages.map((st) => (
+            <li key={st.idx} className="border-b border-line/60 last:border-0">
+              <button
+                onClick={() => {
+                  setOpenStageIdx(openStageIdx === st.idx ? null : st.idx);
+                  setOpenEnemyKey(null);
+                }}
+                className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-surface-2"
+              >
+                <span>{st.name}</span>
+                <span className="ml-auto text-xs text-ink-dim">
+                  最大HP{" "}
+                  <span className="font-bold text-sky-300">
+                    {stageMaxHp(st).toLocaleString()}
+                  </span>
+                </span>
+              </button>
+              {openStageIdx === st.idx && (
+                <div className="bg-sunken/60 px-3 py-2">
+                  <p className="mb-1 text-[10px] text-ink-dim">
+                    敵をタップで詳細。実HP=基礎HP×倍率（★無し基準）。城HP{" "}
+                    {st.hp.toLocaleString()}。
+                  </p>
+                  <ul className="space-y-1">
+                    {stageEnemyRows(st).map((r) => {
+                      const key = `${m.id}#${st.idx}#${r.e.id}@${r.hpMag}@${r.atkMag}`;
+                      const open = openEnemyKey === key;
+                      return (
+                        <li key={key}>
+                          <button
+                            onClick={() => setOpenEnemyKey(open ? null : key)}
+                            className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-sm hover:bg-surface-2"
+                          >
+                            <EnemyIcon id={r.e.id} className="h-7" />
+                            <span>
+                              {r.e.name}
+                              {r.count > 1 && (
+                                <span className="ml-1 text-xs text-ink-dim">×{r.count}</span>
+                              )}
+                              {r.e.traits.length > 0 && (
+                                <span className="ml-1 text-[10px] text-ink-dim">
+                                  [{r.e.traits.join("")}]
+                                </span>
+                              )}
+                            </span>
+                            <span className="ml-auto text-xs text-ink-dim">×{r.hpMag}%</span>
+                            <span className="w-24 text-right text-base font-bold tabular-nums text-sky-300">
+                              {r.real.toLocaleString()}
+                            </span>
+                          </button>
+                          {open && <EnemyDetail e={r.e} hpMag={r.hpMag} atkMag={r.atkMag} />}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 
   const header = (
     <header className="mx-auto flex max-w-3xl items-center gap-2.5 px-4 pt-7 pb-2">
@@ -294,93 +424,53 @@ export default function EnemyStages() {
         {/* ステージタブ */}
         {tab === "stage" && (
           <div className="mt-3 space-y-1.5">
-            {mapResults.map((m) => (
-              <div key={m.id} className="overflow-hidden rounded-xl border border-line bg-surface">
-                <button
-                  onClick={() => {
-                    setOpenMapId(openMapId === m.id ? null : m.id);
-                    setOpenStageIdx(null);
-                    setOpenEnemyKey(null);
-                  }}
-                  className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-surface-2"
-                >
-                  <span className="font-bold">{m.name}</span>
-                  <span className="text-xs text-ink-dim">{m.stages.length}ステージ</span>
-                  <span className="ml-auto text-ink-dim">{openMapId === m.id ? "▲" : "▼"}</span>
-                </button>
-                {openMapId === m.id && (
-                  <ul className="border-t border-line">
-                    {m.stages.map((st) => (
-                      <li key={st.idx} className="border-b border-line/60 last:border-0">
-                        <button
-                          onClick={() => {
-                            setOpenStageIdx(openStageIdx === st.idx ? null : st.idx);
-                            setOpenEnemyKey(null);
-                          }}
-                          className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-surface-2"
-                        >
-                          <span>{st.name}</span>
-                          <span className="ml-auto text-xs text-ink-dim">
-                            最大HP{" "}
-                            <span className="font-bold text-sky-300">
-                              {stageMaxHp(st).toLocaleString()}
-                            </span>
-                          </span>
-                        </button>
-                        {openStageIdx === st.idx && (
-                          <div className="bg-sunken/60 px-3 py-2">
-                            <p className="mb-1 text-[10px] text-ink-dim">
-                              敵をタップで詳細。実HP=基礎HP×倍率（★無し基準）。城HP{" "}
-                              {st.hp.toLocaleString()}。
-                            </p>
-                            <ul className="space-y-1">
-                              {stageEnemyRows(st).map((r) => {
-                                const key = `${st.idx}#${r.e.id}@${r.hpMag}@${r.atkMag}`;
-                                const open = openEnemyKey === key;
-                                return (
-                                  <li key={key}>
-                                    <button
-                                      onClick={() => setOpenEnemyKey(open ? null : key)}
-                                      className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left text-sm hover:bg-surface-2"
-                                    >
-                                      <EnemyIcon id={r.e.id} className="h-7" />
-                                      <span>
-                                        {r.e.name}
-                                        {r.count > 1 && (
-                                          <span className="ml-1 text-xs text-ink-dim">
-                                            ×{r.count}
-                                          </span>
-                                        )}
-                                        {r.e.traits.length > 0 && (
-                                          <span className="ml-1 text-[10px] text-ink-dim">
-                                            [{r.e.traits.join("")}]
-                                          </span>
-                                        )}
-                                      </span>
-                                      <span className="ml-auto text-xs text-ink-dim">
-                                        ×{r.hpMag}%
-                                      </span>
-                                      <span className="w-24 text-right text-base font-bold tabular-nums text-sky-300">
-                                        {r.real.toLocaleString()}
-                                      </span>
-                                    </button>
-                                    {open && (
-                                      <EnemyDetail e={r.e} hpMag={r.hpMag} atkMag={r.atkMag} />
-                                    )}
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+            {query ? (
+              <>
+                {mapResults.map(renderMap)}
+                {mapResults.length === 0 && (
+                  <p className="py-8 text-center text-ink-dim">
+                    該当するステージがありません。
+                  </p>
                 )}
-              </div>
-            ))}
-            {query && mapResults.length === 0 && (
-              <p className="py-8 text-center text-ink-dim">該当するステージがありません。</p>
+              </>
+            ) : (
+              <>
+                <a
+                  href="https://battlecats.club/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-xl border border-brand/30 bg-brand/5 px-4 py-2.5 text-sm text-brand hover:bg-brand/10"
+                >
+                  <span className="font-bold">📅 今のイベント開催スケジュール</span>
+                  <span className="ml-auto text-xs">外部サイトで見る →</span>
+                </a>
+                {categorized.map((cat) => (
+                  <div
+                    key={cat.grp}
+                    className="overflow-hidden rounded-xl border border-line bg-surface"
+                  >
+                    <button
+                      onClick={() => {
+                        setOpenCategory(openCategory === cat.grp ? null : cat.grp);
+                        setOpenMapId(null);
+                        setOpenStageIdx(null);
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-surface-2"
+                    >
+                      <span className="font-bold">{cat.label}</span>
+                      <span className="text-xs text-ink-dim">{cat.maps.length}マップ</span>
+                      <span className="ml-auto text-ink-dim">
+                        {openCategory === cat.grp ? "▲" : "▼"}
+                      </span>
+                    </button>
+                    {openCategory === cat.grp && (
+                      <div className="space-y-1.5 border-t border-line bg-sunken/40 p-2">
+                        {cat.maps.map(renderMap)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </>
             )}
           </div>
         )}
