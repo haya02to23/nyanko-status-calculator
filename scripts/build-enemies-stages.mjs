@@ -135,6 +135,9 @@ for (const key in stageData) {
       id: mapId,
       grp: Math.floor(mapId / 1000),
       name: m?.nameJp || m?.name || `マップ${mapId}`,
+      // 冠(★)別倍率 [冠1,冠2,…]。冠1=100%基準、冠2以降がマップ毎に変化。
+      // 0個=冠なし(1難易度)。レジェンドの実HP/ATKはこの倍率も掛かる。
+      stars: Array.isArray(m?.stars) ? m.stars : [],
       stages: [],
       colossus: false, // 超生命体の敵が出る(超生命体強襲の判定)
       reward: false, // クリア特典(レジェンドにゃんこ入手)のある章

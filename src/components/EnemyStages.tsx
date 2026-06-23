@@ -27,6 +27,7 @@ type MapData = {
   grp: number;
   name: string;
   stages: Stage[];
+  stars?: number[]; // 冠別倍率 [冠1=100,冠2,…]。空=冠なし
   colossus?: boolean; // 超生命体の敵が出る
   reward?: boolean; // クリア特典(レジェンドにゃんこ入手)のある章
 };
@@ -88,13 +89,18 @@ function EnemyDetail({
   e,
   hpMag,
   atkMag,
+  crownMult = 1,
+  crownPct,
 }: {
   e: Enemy;
   hpMag?: number;
   atkMag?: number;
+  crownMult?: number; // 冠倍率(1=冠1基準)
+  crownPct?: number; // 表示用の冠倍率%
 }) {
-  const realHp = hpMag != null ? Math.round(e.hp * (hpMag / 100)) : e.hp;
-  const realAtk = atkMag != null ? Math.round(e.atk * (atkMag / 100)) : e.atk;
+  const realHp = hpMag != null ? Math.round(e.hp * (hpMag / 100) * crownMult) : e.hp;
+  const realAtk = atkMag != null ? Math.round(e.atk * (atkMag / 100) * crownMult) : e.atk;
+  const showCrown = crownPct != null && crownPct !== 100;
   const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div className="flex items-baseline justify-between gap-2 border-b border-line/50 py-1">
       <span className="shrink-0 text-xs text-ink-dim">{label}</span>
@@ -120,17 +126,17 @@ function EnemyDetail({
       <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
         <Row label="体力">
           <span className="text-base font-bold text-sky-300">{realHp.toLocaleString()}</span>
-          {hpMag != null && hpMag !== 100 && (
+          {hpMag != null && (hpMag !== 100 || showCrown) && (
             <span className="ml-1 text-[11px] text-ink-dim">
-              ({e.hp.toLocaleString()}×{hpMag}%)
+              ({e.hp.toLocaleString()}×{hpMag}%{showCrown && `×冠${crownPct}%`})
             </span>
           )}
         </Row>
         <Row label="攻撃力">
           <span className="text-base font-bold text-sky-300">{realAtk.toLocaleString()}</span>
-          {atkMag != null && atkMag !== 100 && (
+          {atkMag != null && (atkMag !== 100 || showCrown) && (
             <span className="ml-1 text-[11px] text-ink-dim">
-              ({e.atk.toLocaleString()}×{atkMag}%)
+              ({e.atk.toLocaleString()}×{atkMag}%{showCrown && `×冠${crownPct}%`})
             </span>
           )}
         </Row>
@@ -180,6 +186,7 @@ export default function EnemyStages() {
   const [openMapId, setOpenMapId] = useState<number | null>(null);
   const [openStageIdx, setOpenStageIdx] = useState<number | null>(null);
   const [openEnemyKey, setOpenEnemyKey] = useState<string | null>(null);
+  const [crown, setCrown] = useState(0); // 選択中の冠(0=冠1)。マップ展開時のみ有効
 
   useEffect(() => {
     Promise.all([
@@ -234,8 +241,8 @@ export default function EnemyStages() {
       .slice(0, 60);
   }, [enemies, query]);
 
-  // ステージ内の敵を実HP込みで整形(実HP降順、同一敵+倍率はまとめ)
-  const stageEnemyRows = (st: Stage) => {
+  // ステージ内の敵を実HP込みで整形(実HP降順、同一敵+倍率はまとめ)。冠倍率も反映。
+  const stageEnemyRows = (st: Stage, crownMult = 1) => {
     if (!enemies) return [];
     const merged = new Map<
       string,
@@ -252,25 +259,35 @@ export default function EnemyStages() {
           e,
           hpMag,
           atkMag,
-          real: Math.round(e.hp * (hpMag / 100)),
+          real: Math.round(e.hp * (hpMag / 100) * crownMult),
           count: 1,
         });
     }
     return [...merged.values()].sort((a, b) => b.real - a.real);
   };
 
-  const stageMaxHp = (st: Stage) => {
+  const stageMaxHp = (st: Stage, crownMult = 1) => {
     if (!enemies) return 0;
     let mx = 0;
     for (const [eid, hpMag] of st.enemies) {
       const e = enemies.get(eid);
-      if (e) mx = Math.max(mx, Math.round(e.hp * (hpMag / 100)));
+      if (e) mx = Math.max(mx, Math.round(e.hp * (hpMag / 100) * crownMult));
     }
     return mx;
   };
 
+  // マップで選択中の冠の倍率。stars=[冠1,冠2,…]。選択冠が無ければクランプ。
+  const crownInfo = (m: MapData) => {
+    const stars = m.stars && m.stars.length > 0 ? m.stars : [100];
+    const idx = Math.min(crown, stars.length - 1);
+    return { stars, idx, pct: stars[idx], mult: stars[idx] / 100 };
+  };
+
   // 1マップ分(展開でステージ→敵)。検索結果とカテゴリ両方で再利用。
-  const renderMap = (m: MapData) => (
+  const renderMap = (m: MapData) => {
+    const ci = crownInfo(m);
+    const hasCrowns = ci.stars.length > 1; // 冠2以上が存在する=冠選択あり
+    return (
     <div
       key={m.id}
       className={`overflow-hidden rounded-xl border bg-surface ${
@@ -294,6 +311,25 @@ export default function EnemyStages() {
         <span className="text-xs text-ink-dim">{m.stages.length}ステージ</span>
         <span className="ml-auto text-ink-dim">{openMapId === m.id ? "▲" : "▼"}</span>
       </button>
+      {openMapId === m.id && hasCrowns && (
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-line bg-sunken/40 px-4 py-2">
+          <span className="mr-1 text-xs text-ink-dim">難易度</span>
+          {ci.stars.map((pct, i) => (
+            <button
+              key={i}
+              onClick={() => setCrown(i)}
+              className={`rounded-md px-2 py-1 text-xs tabular-nums ${
+                ci.idx === i
+                  ? "bg-brand font-bold text-bg"
+                  : "bg-surface-2 text-ink hover:bg-surface"
+              }`}
+            >
+              {"👑".repeat(i + 1)}
+              <span className="ml-1 opacity-80">{pct}%</span>
+            </button>
+          ))}
+        </div>
+      )}
       {openMapId === m.id && (
         <ul className="border-t border-line">
           {m.stages.map((st) => (
@@ -309,18 +345,19 @@ export default function EnemyStages() {
                 <span className="ml-auto text-xs text-ink-dim">
                   最大HP{" "}
                   <span className="font-bold text-sky-300">
-                    {stageMaxHp(st).toLocaleString()}
+                    {stageMaxHp(st, ci.mult).toLocaleString()}
                   </span>
                 </span>
               </button>
               {openStageIdx === st.idx && (
                 <div className="bg-sunken/60 px-3 py-2">
                   <p className="mb-1 text-[10px] text-ink-dim">
-                    敵をタップで詳細。実HP=基礎HP×倍率（★無し基準）。城HP{" "}
+                    敵をタップで詳細。実HP=基礎HP×倍率
+                    {hasCrowns ? `×冠${ci.pct}%` : "（★無し基準）"}。城HP{" "}
                     {st.hp.toLocaleString()}。
                   </p>
                   <ul className="space-y-1">
-                    {stageEnemyRows(st).map((r) => {
+                    {stageEnemyRows(st, ci.mult).map((r) => {
                       const key = `${m.id}#${st.idx}#${r.e.id}@${r.hpMag}@${r.atkMag}`;
                       const open = openEnemyKey === key;
                       return (
@@ -346,7 +383,15 @@ export default function EnemyStages() {
                               {r.real.toLocaleString()}
                             </span>
                           </button>
-                          {open && <EnemyDetail e={r.e} hpMag={r.hpMag} atkMag={r.atkMag} />}
+                          {open && (
+                            <EnemyDetail
+                              e={r.e}
+                              hpMag={r.hpMag}
+                              atkMag={r.atkMag}
+                              crownMult={ci.mult}
+                              crownPct={ci.pct}
+                            />
+                          )}
                         </li>
                       );
                     })}
@@ -358,7 +403,8 @@ export default function EnemyStages() {
         </ul>
       )}
     </div>
-  );
+    );
+  };
 
   const header = (
     <header className="mx-auto flex max-w-3xl items-center gap-2.5 px-4 pt-7 pb-2">
