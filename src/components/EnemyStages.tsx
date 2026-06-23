@@ -67,21 +67,68 @@ const HOME_CATEGORIES: HomeCat[] = [
   { key: "g0", label: "旧レジェンド", grp: 0 },
 ];
 
-// レジェンド3種はゲーム準拠のテーマ色でヘッダーを色分け(識別性UP)。
-// 色はカテゴリのchrome(枠/ヘッダー/左線)だけに使い、中身は共通トーンを保つ。
-// それ以外のカテゴリは既存ブランド色。Tailwind JIT向けにクラスは静的文字列で持つ。
-type Accent = { border: string; header: string; panel: string };
-const BRAND_ACCENT: Accent = {
-  border: "border-brand/50",
-  header: "bg-brand text-bg",
-  panel: "border-brand/50",
+// カテゴリをゲーム準拠の淡いテーマ色で色分け(閉じたホーム状態でも識別可)。
+// ベタ塗りせず淡いグラデ+薄縁+ソフトな文字色で"エモ"な質感に。色はchrome
+// (枠/ヘッダー/左線/ラベル)だけに使い中身は共通トーン。Tailwind JIT向けに静的文字列。
+// closed=閉じた時の枠/淡背景, open=開いた時の枠/背景, header=開ヘッダーのグラデ+文字, panel=左線。
+type Accent = { closed: string; open: string; header: string; panel: string; label: string };
+const PALETTES: Record<string, Accent> = {
+  // 薄い赤(降臨/大降臨/超生命体強襲=よく使う)
+  rose: {
+    closed: "border-rose-500/25 bg-rose-500/10",
+    open: "border-rose-400/45 bg-sunken",
+    header:
+      "bg-gradient-to-r from-rose-500/30 via-rose-500/12 to-transparent text-rose-100 ring-1 ring-inset ring-rose-400/20",
+    panel: "border-rose-400/45",
+    label: "text-rose-100",
+  },
+  // 水色(ゼロレジェ)
+  sky: {
+    closed: "border-sky-500/25 bg-sky-500/10",
+    open: "border-sky-400/45 bg-sunken",
+    header:
+      "bg-gradient-to-r from-sky-500/30 via-sky-500/12 to-transparent text-sky-100 ring-1 ring-inset ring-sky-400/20",
+    panel: "border-sky-400/45",
+    label: "text-sky-100",
+  },
+  // 黄緑(真レジェ)
+  lime: {
+    closed: "border-lime-500/25 bg-lime-500/10",
+    open: "border-lime-400/45 bg-sunken",
+    header:
+      "bg-gradient-to-r from-lime-500/30 via-lime-500/12 to-transparent text-lime-100 ring-1 ring-inset ring-lime-400/20",
+    panel: "border-lime-400/45",
+    label: "text-lime-100",
+  },
+  // 黄色(旧レジェ)
+  amber: {
+    closed: "border-amber-500/25 bg-amber-500/10",
+    open: "border-amber-400/45 bg-sunken",
+    header:
+      "bg-gradient-to-r from-amber-500/30 via-amber-500/12 to-transparent text-amber-100 ring-1 ring-inset ring-amber-400/20",
+    panel: "border-amber-400/45",
+    label: "text-amber-100",
+  },
+  // 既定(その他カテゴリ=ブランド)
+  default: {
+    closed: "border-line bg-surface",
+    open: "border-brand/40 bg-sunken",
+    header:
+      "bg-gradient-to-r from-brand/25 via-brand/10 to-transparent text-brand ring-1 ring-inset ring-brand/20",
+    panel: "border-brand/40",
+    label: "text-ink",
+  },
 };
-const CAT_ACCENT: Record<string, Accent> = {
-  g16: { border: "border-sky-400/50", header: "bg-sky-400 text-bg", panel: "border-sky-400/50" }, // ゼロレジェ=水色
-  g9: { border: "border-lime-400/50", header: "bg-lime-400 text-bg", panel: "border-lime-400/50" }, // 真レジェ=黄緑
-  g0: { border: "border-amber-400/50", header: "bg-amber-400 text-bg", panel: "border-amber-400/50" }, // 旧レジェ=黄色
+// カテゴリkey→パレット。指定外は default。
+const KEY_PALETTE: Record<string, string> = {
+  advent: "rose",
+  advent_big: "rose",
+  colossus: "rose",
+  g16: "sky",
+  g9: "lime",
+  g0: "amber",
 };
-const accentOf = (key: string): Accent => CAT_ACCENT[key] ?? BRAND_ACCENT;
+const accentOf = (key: string): Accent => PALETTES[KEY_PALETTE[key] ?? "default"];
 
 // 敵アイコン(public/icons/enemies/{id}.webp)。遅延読込・無ければ非表示。
 function EnemyIcon({ id, className = "" }: { id: number; className?: string }) {
@@ -522,8 +569,8 @@ export default function EnemyStages() {
                   return (
                   <div
                     key={cat.key}
-                    className={`overflow-hidden rounded-xl border ${
-                      open ? `${ac.border} bg-sunken` : "border-line bg-surface"
+                    className={`overflow-hidden rounded-xl border transition-colors ${
+                      open ? ac.open : `${ac.closed} hover:brightness-110`
                     }`}
                   >
                     <button
@@ -533,18 +580,12 @@ export default function EnemyStages() {
                         setOpenStageIdx(null);
                       }}
                       className={`flex w-full items-center gap-2 px-4 py-3 text-left ${
-                        open
-                          ? `sticky top-0 z-10 ${ac.header}`
-                          : "hover:bg-surface-2"
+                        open ? `sticky top-0 z-10 ${ac.header}` : ""
                       }`}
                     >
-                      <span className="font-bold">{cat.label}</span>
-                      <span className={`text-xs ${open ? "text-bg/70" : "text-ink-dim"}`}>
-                        {cat.maps.length}マップ
-                      </span>
-                      <span className={`ml-auto ${open ? "text-bg/80" : "text-ink-dim"}`}>
-                        {open ? "▲" : "▼"}
-                      </span>
+                      <span className={`font-bold ${ac.label}`}>{cat.label}</span>
+                      <span className="text-xs text-ink-dim">{cat.maps.length}マップ</span>
+                      <span className="ml-auto text-ink-dim">{open ? "▲" : "▼"}</span>
                     </button>
                     {open && (
                       <div className={`space-y-1.5 border-l-2 ${ac.panel} bg-sunken/40 p-2 pl-2.5`}>
