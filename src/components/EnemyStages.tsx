@@ -67,6 +67,22 @@ const HOME_CATEGORIES: HomeCat[] = [
   { key: "g0", label: "旧レジェンド", grp: 0 },
 ];
 
+// レジェンド3種はゲーム準拠のテーマ色でヘッダーを色分け(識別性UP)。
+// 色はカテゴリのchrome(枠/ヘッダー/左線)だけに使い、中身は共通トーンを保つ。
+// それ以外のカテゴリは既存ブランド色。Tailwind JIT向けにクラスは静的文字列で持つ。
+type Accent = { border: string; header: string; panel: string };
+const BRAND_ACCENT: Accent = {
+  border: "border-brand/50",
+  header: "bg-brand text-bg",
+  panel: "border-brand/50",
+};
+const CAT_ACCENT: Record<string, Accent> = {
+  g16: { border: "border-sky-400/50", header: "bg-sky-400 text-bg", panel: "border-sky-400/50" }, // ゼロレジェ=水色
+  g9: { border: "border-lime-400/50", header: "bg-lime-400 text-bg", panel: "border-lime-400/50" }, // 真レジェ=黄緑
+  g0: { border: "border-amber-400/50", header: "bg-amber-400 text-bg", panel: "border-amber-400/50" }, // 旧レジェ=黄色
+};
+const accentOf = (key: string): Accent => CAT_ACCENT[key] ?? BRAND_ACCENT;
+
 // 敵アイコン(public/icons/enemies/{id}.webp)。遅延読込・無ければ非表示。
 function EnemyIcon({ id, className = "" }: { id: number; className?: string }) {
   return (
@@ -502,11 +518,12 @@ export default function EnemyStages() {
                 </a>
                 {categorized.map((cat) => {
                   const open = openCategory === cat.key;
+                  const ac = accentOf(cat.key);
                   return (
                   <div
                     key={cat.key}
                     className={`overflow-hidden rounded-xl border ${
-                      open ? "border-brand/50 bg-sunken" : "border-line bg-surface"
+                      open ? `${ac.border} bg-sunken` : "border-line bg-surface"
                     }`}
                   >
                     <button
@@ -517,7 +534,7 @@ export default function EnemyStages() {
                       }}
                       className={`flex w-full items-center gap-2 px-4 py-3 text-left ${
                         open
-                          ? "sticky top-0 z-10 bg-brand text-bg"
+                          ? `sticky top-0 z-10 ${ac.header}`
                           : "hover:bg-surface-2"
                       }`}
                     >
@@ -530,7 +547,7 @@ export default function EnemyStages() {
                       </span>
                     </button>
                     {open && (
-                      <div className="space-y-1.5 border-l-2 border-brand/50 bg-sunken/40 p-2 pl-2.5">
+                      <div className={`space-y-1.5 border-l-2 ${ac.panel} bg-sunken/40 p-2 pl-2.5`}>
                         {cat.maps.map(renderMap)}
                       </div>
                     )}
