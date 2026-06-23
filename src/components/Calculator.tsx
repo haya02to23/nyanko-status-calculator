@@ -414,7 +414,7 @@ export default function Calculator() {
         className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-sky-400/40 bg-sky-500/10 py-1.5 pl-1.5 pr-2.5 text-sm text-sky-200 transition-colors hover:bg-sky-500/20"
       >
         <img
-          src="/icon/enemy_culc_icon.PNG"
+          src="/icon/enemy_culc_icon.webp"
           alt=""
           width={24}
           height={24}
@@ -495,7 +495,7 @@ export default function Calculator() {
             className="mx-auto mt-8 flex max-w-md items-center gap-3 rounded-2xl border border-sky-400/40 bg-sky-500/10 p-3 text-left transition-colors hover:bg-sky-500/20"
           >
             <img
-              src="/icon/enemy_culc_icon.PNG"
+              src="/icon/enemy_culc_icon.webp"
               alt=""
               width={56}
               height={56}

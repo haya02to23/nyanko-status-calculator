@@ -491,7 +491,7 @@ export default function EnemyStages() {
       <div className="flex items-center gap-2.5">
         <span className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl">
           <img
-            src="/icon/enemy_culc_icon.PNG"
+            src="/icon/enemy_culc_icon.webp"
             alt=""
             width={36}
             height={36}
