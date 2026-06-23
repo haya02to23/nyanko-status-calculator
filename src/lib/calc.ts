@@ -44,7 +44,18 @@ export type CalcOptions = {
   treasure: number; // 日本編お宝倍率 1.0〜2.5
   talentLevels: number[]; // cat.talents と同じ順のレベル(0=未解放)
   combos: Combo[]; // 選択中のにゃんコンボ
+  orbAtkPct?: number; // 攻撃の玉: 攻撃のレベル倍率に上乗せする%(対象属性時のみ。既定0)
+  orbDmgReduction?: number; // 防御の玉: 被ダメージ減少%(対象属性時のみ。実質体力に反映。既定0)
 };
+
+// 本能玉のグレード(D..S)→ランク値1..5。攻撃の玉は「+1レベル分の攻撃力 × (2×ランク)」、
+// 防御の玉は「被ダメージ -4×ランク %」(seesaawiki公式値, battlecatsinfo実装と一致)。
+export const ORB_GRADES = ["D", "C", "B", "A", "S"] as const;
+// 攻撃の玉: 合計ランクから 攻撃レベル倍率への上乗せ%。1レベル分=growth[0]%(最初の増分)。
+export const orbAtkPctOf = (growth: number[], gradeRankSum: number): number =>
+  gradeRankSum * 2 * (growth[0] ?? 0);
+// 防御の玉: 合計ランク → 被ダメージ減少%(4×ランク, スタック)
+export const orbDmgReductionOf = (gradeRankSum: number): number => gradeRankSum * 4;
 
 export type CalcResult = {
   totalLevel: number;
@@ -112,14 +123,19 @@ export function calcStats(cat: Cat, form: CatForm, opt: CalcOptions): CalcResult
     }
   }
 
+  // 防御の玉: 被ダメージ減少 → 実質体力 = 体力 / (1 - 減少率)。対象属性時のみ呼び出し側が指定。
+  const dmgRed = opt.orbDmgReduction ?? 0;
   const hpBase = applyLevel(form.hp, multPct, opt.treasure);
-  const hp = Math.floor(
+  let hp = Math.floor(
     Math.floor(hpBase * (1 + hpTalentPct / 100)) * (1 + hpComboPct / 100)
   );
+  if (dmgRed > 0) hp = Math.floor(hp / (1 - dmgRed / 100));
 
+  // 攻撃の玉: 攻撃のレベル倍率に上乗せ(対象属性時のみ)。体力には掛けない。
+  const atkMultPct = multPct + (opt.orbAtkPct ?? 0);
   const hits = form.atk.filter((a) => a > 0);
   const atkHitsBase = (hits.length ? hits : [form.atk[0]]).map((a) =>
-    applyLevel(a, multPct, opt.treasure)
+    applyLevel(a, atkMultPct, opt.treasure)
   );
   const atkHits = atkHitsBase.map((a) =>
     Math.floor(Math.floor(a * (1 + atkTalentPct / 100)) * (1 + atkComboPct / 100))

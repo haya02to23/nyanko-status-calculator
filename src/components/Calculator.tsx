@@ -11,6 +11,9 @@ import {
   slayerGroupsOf,
   resolveTalents,
   splashEffects,
+  ORB_GRADES,
+  orbAtkPctOf,
+  orbDmgReductionOf,
   COMBO_ATK_UP,
   COMBO_HP_UP,
   COMBO_SPEED_UP,
@@ -45,6 +48,25 @@ const RARITY_COLORS = [
 ];
 
 const HISTORY_KEY = "nyanko-calc-history";
+
+// 本能玉。攻撃の玉=対象属性に攻撃力アップ、防御の玉=対象属性から被ダメージ減少。
+type OrbKind = "atk" | "def";
+type Orb = { kind: OrbKind; trait: string; grade: number }; // grade=ランク1..5(D..S)
+// 対象にできる9属性(battlecatsinfoのORB定義準拠)
+const ORB_TRAITS: { key: string; label: string }[] = [
+  { key: "red", label: "赤い敵" },
+  { key: "floating", label: "浮いてる敵" },
+  { key: "black", label: "黒い敵" },
+  { key: "metal", label: "メタルな敵" },
+  { key: "angel", label: "天使" },
+  { key: "alien", label: "エイリアン" },
+  { key: "zombie", label: "ゾンビ" },
+  { key: "relic", label: "古代種" },
+  { key: "aku", label: "悪魔" },
+];
+const ORB_TRAIT_LABEL: Record<string, string> = Object.fromEntries(
+  ORB_TRAITS.map((t) => [t.key, t.label])
+);
 
 // 形態に応じた既定レベル: 第4形態(超化)はLv60で解放されるため60スタート
 const defaultLevelForForm = (formIdx: number, maxBase: number) =>
@@ -129,6 +151,8 @@ export default function Calculator() {
   const [plus, setPlus] = useState(0);
   const [treasure, setTreasure] = useState(2.5);
   const [talentLv, setTalentLv] = useState<number[]>([]);
+  // 装着中の本能玉(スロット順。空スロットはnull)
+  const [orbs, setOrbs] = useState<(Orb | null)[]>([]);
   const [comboIds, setComboIds] = useState<number[]>([]);
   const [comboQuery, setComboQuery] = useState("");
   const [comboOpen, setComboOpen] = useState(false);
@@ -186,6 +210,7 @@ export default function Calculator() {
     setLevel(defaultLevelForForm(lastIdx, maxBase));
     setPlus(0);
     setTalentLv(c.talents ? c.talents.map((t) => t.maxLv) : []);
+    setOrbs([]);
     setSlayerOn(new Set());
     setQuery("");
     // 検索履歴を更新(先頭に追加・重複除去・最大8件)
@@ -239,6 +264,51 @@ export default function Calculator() {
       combos: selectedCombos,
     });
   }, [cat, form, level, plus, treasure, activeTalentLv, selectedCombos]);
+
+  // 本能玉スロット数: 本能解放(第3形態)で1個、超本能解放(Lv60+超本能持ち)で2個。
+  const hasTalents = !!cat?.talents?.length;
+  const hasUltra = !!cat?.talents?.some((t) => t.ultra);
+  const orbSlots = !talentsActive || !hasTalents ? 0 : hasUltra && ultraActive ? 2 : 1;
+
+  // 装着玉を属性ごとに集計し、対象別の実質攻撃力/体力を計算(玉は対象属性時のみ有効)。
+  const orbEffects = useMemo(() => {
+    if (!cat || !form || !result || orbSlots === 0) return [];
+    const active = orbs.slice(0, orbSlots).filter((o): o is Orb => !!o);
+    if (!active.length) return [];
+    const byTrait = new Map<string, { atk: number; def: number }>();
+    for (const o of active) {
+      const cur = byTrait.get(o.trait) ?? { atk: 0, def: 0 };
+      if (o.kind === "atk") cur.atk += o.grade;
+      else cur.def += o.grade;
+      byTrait.set(o.trait, cur);
+    }
+    const baseOpt = {
+      level,
+      plus,
+      treasure,
+      talentLevels: activeTalentLv,
+      combos: selectedCombos,
+    };
+    const out = [...byTrait.entries()].map(([trait, r]) => {
+      const orbAtkPct = orbAtkPctOf(cat.growth, r.atk);
+      const dmgRed = orbDmgReductionOf(r.def);
+      const res = calcStats(cat, form, { ...baseOpt, orbAtkPct, orbDmgReduction: dmgRed });
+      return {
+        trait,
+        hasAtk: r.atk > 0,
+        hasDef: r.def > 0,
+        atk: res.atk,
+        hp: res.hp,
+        atkUpPct: r.atk ? Math.round((res.atk / result.atk - 1) * 1000) / 10 : 0,
+        dmgRed,
+      };
+    });
+    return out.sort(
+      (a, b) =>
+        ORB_TRAITS.findIndex((t) => t.key === a.trait) -
+        ORB_TRAITS.findIndex((t) => t.key === b.trait)
+    );
+  }, [cat, form, result, orbSlots, orbs, level, plus, treasure, activeTalentLv, selectedCombos]);
 
   // 本能・超本能による能力解放を反映した実効ステータス
   const resolved = useMemo(
@@ -1100,6 +1170,135 @@ export default function Calculator() {
                   );
                 })}
               </div>
+            </section>
+          )}
+
+          {/* 本能玉(本能解放で1枠・超本能解放で2枠) */}
+          {orbSlots > 0 && (
+            <section className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-black/20">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold">
+                  本能玉 <span className="text-xs font-normal text-ink-dim">{orbSlots}枠</span>
+                </h3>
+                {orbs.slice(0, orbSlots).some(Boolean) && (
+                  <button
+                    onClick={() => setOrbs([])}
+                    className="rounded-lg bg-surface-2 px-2.5 py-1 text-xs hover:bg-surface-2"
+                  >
+                    全て外す
+                  </button>
+                )}
+              </div>
+              <div className="mt-3 space-y-2">
+                {Array.from({ length: orbSlots }).map((_, i) => {
+                  const orb = orbs[i] ?? null;
+                  const setSlot = (next: Orb | null) => {
+                    const arr = [...orbs];
+                    while (arr.length < orbSlots) arr.push(null);
+                    arr[i] = next;
+                    setOrbs(arr);
+                  };
+                  return (
+                    <div
+                      key={i}
+                      className="flex flex-wrap items-center gap-1.5 rounded-lg bg-sunken p-2"
+                    >
+                      <span className="text-xs text-ink-dim">枠{i + 1}</span>
+                      {orb ? (
+                        <>
+                          <select
+                            value={orb.kind}
+                            onChange={(e) =>
+                              setSlot({ ...orb, kind: e.target.value as OrbKind })
+                            }
+                            className="rounded-md border border-line bg-surface-2 px-2 py-1 text-xs outline-none"
+                          >
+                            <option value="atk">攻撃の玉</option>
+                            <option value="def">防御の玉</option>
+                          </select>
+                          <select
+                            value={orb.trait}
+                            onChange={(e) => setSlot({ ...orb, trait: e.target.value })}
+                            className="rounded-md border border-line bg-surface-2 px-2 py-1 text-xs outline-none"
+                          >
+                            {ORB_TRAITS.map((t) => (
+                              <option key={t.key} value={t.key}>
+                                {t.label}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={orb.grade}
+                            onChange={(e) =>
+                              setSlot({ ...orb, grade: Number(e.target.value) })
+                            }
+                            className="rounded-md border border-line bg-surface-2 px-2 py-1 text-xs outline-none"
+                          >
+                            {ORB_GRADES.map((g, gi) => (
+                              <option key={g} value={gi + 1}>
+                                {g}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => setSlot(null)}
+                            className="rounded-md px-2 py-1 text-xs text-ink-dim hover:text-red-400"
+                            aria-label="外す"
+                          >
+                            ✕
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setSlot({ kind: "atk", trait: "red", grade: 5 })}
+                          className="rounded-md bg-surface-2 px-3 py-1 text-xs text-ink-dim hover:text-ink"
+                        >
+                          ＋ 玉を装着
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {orbEffects.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  {orbEffects.map((e) => (
+                    <div
+                      key={e.trait}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-line/60 pt-1.5 text-sm"
+                    >
+                      <span className="rounded bg-surface-2 px-1.5 py-0.5 text-xs">
+                        対{ORB_TRAIT_LABEL[e.trait]}
+                      </span>
+                      {e.hasAtk && (
+                        <span className="tabular-nums">
+                          攻撃{" "}
+                          <span className="font-bold text-sky-300">
+                            {e.atk.toLocaleString()}
+                          </span>
+                          <span className="ml-1 text-xs text-emerald-300">+{e.atkUpPct}%</span>
+                        </span>
+                      )}
+                      {e.hasDef && (
+                        <span className="tabular-nums">
+                          実質体力{" "}
+                          <span className="font-bold text-sky-300">
+                            {e.hp.toLocaleString()}
+                          </span>
+                          <span className="ml-1 text-xs text-emerald-300">
+                            被ダメ-{e.dmgRed}%
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="mt-3 text-[11px] leading-relaxed text-ink-dim">
+                ※攻撃の玉=対象属性への攻撃力アップ / 防御の玉=対象属性からの被ダメージ減少(実質体力に換算)。
+                効果は対象属性の敵にのみ発動。特攻トグルとは別計算です。
+              </p>
             </section>
           )}
 
