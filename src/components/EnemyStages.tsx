@@ -505,9 +505,17 @@ export default function EnemyStages() {
       </div>
       <Link
         href="/"
-        className="ml-auto rounded-lg bg-surface-2 px-3 py-1.5 text-sm text-ink-dim hover:text-ink"
+        className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-brand/40 bg-brand/10 py-1.5 pl-2.5 pr-1.5 text-sm text-brand transition-colors hover:bg-brand/20"
       >
-        ← 計算機
+        <span aria-hidden>←</span>
+        <span className="font-bold">計算機</span>
+        <img
+          src="/icon/icon-192.png"
+          alt=""
+          width={24}
+          height={24}
+          className="h-6 w-6 rounded object-cover"
+        />
       </Link>
     </header>
   );
