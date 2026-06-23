@@ -58,7 +58,7 @@ const HOME_CATEGORIES: HomeCat[] = [
   },
   { key: "manic", label: "大狂乱ステージ", filter: (m) => isAdvent(m) && /大狂乱/.test(m.name) },
   { key: "g11", label: "強襲ステージ", filter: (m) => m.grp === 11 && !m.colossus },
-  { key: "colossus", label: "超生命体強襲", filter: (m) => m.grp === 11 && !!m.colossus },
+  { key: "colossus", label: "超生命体強襲", filter: (m) => m.grp === 11 && !!m.colossus && !m.name.includes("(旧)") },
   { key: "g14", label: "超獣討伐ステージ", grp: 14 },
   { key: "g12", label: "発掘ステージ", grp: 12 },
   { key: "g16", label: "ゼロレジェンド", grp: 16 },
