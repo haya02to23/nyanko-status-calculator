@@ -411,9 +411,17 @@ export default function Calculator() {
       </button>
       <Link
         href="/enemies"
-        className="ml-auto shrink-0 rounded-lg bg-surface-2 px-3 py-1.5 text-sm text-ink-dim hover:text-ink"
+        className="ml-auto flex shrink-0 items-center gap-1.5 rounded-lg border border-sky-400/40 bg-sky-500/10 py-1.5 pl-1.5 pr-2.5 text-sm text-sky-200 transition-colors hover:bg-sky-500/20"
       >
-        敵・ステージ →
+        <img
+          src="/icon/enemy_culc_icon.PNG"
+          alt=""
+          width={24}
+          height={24}
+          className="h-6 w-6 rounded object-cover"
+        />
+        <span className="font-bold">敵・ステージ</span>
+        <span aria-hidden>→</span>
       </Link>
     </header>
   );
@@ -480,6 +488,26 @@ export default function Calculator() {
           <p className="mt-2 text-sm text-ink-dim">
             レベル・本能・にゃんコンボ・ダメージ補正込みの実質ステータスを計算します
           </p>
+
+          {/* 敵・ステージ図鑑への誘導カード */}
+          <Link
+            href="/enemies"
+            className="mx-auto mt-8 flex max-w-md items-center gap-3 rounded-2xl border border-sky-400/40 bg-sky-500/10 p-3 text-left transition-colors hover:bg-sky-500/20"
+          >
+            <img
+              src="/icon/enemy_culc_icon.PNG"
+              alt=""
+              width={56}
+              height={56}
+              className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-sky-400/30"
+            />
+            <div className="min-w-0">
+              <p className="font-bold text-sky-200">敵・ステージ図鑑はこちら →</p>
+              <p className="mt-0.5 text-xs text-ink-dim">
+                降臨・強襲・レジェンドの出現敵の実HP・倍率・クリア報酬を確認
+              </p>
+            </div>
+          </Link>
           {historyCats.length > 0 && (
             <div className="mx-auto mt-8 max-w-md text-left">
               <p className="mb-2 text-xs text-ink-dim">最近見たキャラ</p>

@@ -488,15 +488,21 @@ export default function EnemyStages() {
 
   const header = (
     <header className="mx-auto flex max-w-3xl items-center gap-2.5 px-4 pt-7 pb-2">
-      <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80">
+      <div className="flex items-center gap-2.5">
         <span className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl">
-          <img src="/icon/icon_ver2.PNG" alt="" width={36} height={36} className="object-cover" />
+          <img
+            src="/icon/enemy_culc_icon.PNG"
+            alt=""
+            width={36}
+            height={36}
+            className="object-cover"
+          />
         </span>
         <div>
           <h1 className="text-lg font-bold tracking-tight text-ink">敵・ステージ図鑑</h1>
           <p className="text-[11px] text-ink-dim">ステージに出る敵の倍率・実HP・能力を確認</p>
         </div>
-      </Link>
+      </div>
       <Link
         href="/"
         className="ml-auto rounded-lg bg-surface-2 px-3 py-1.5 text-sm text-ink-dim hover:text-ink"
