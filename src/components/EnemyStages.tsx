@@ -16,12 +16,25 @@ type Enemy = {
   traits: string[];
   abilities: string[];
 };
+type StageReward = { name: string; rarity: number; prob: number }; // ユニットクリア報酬
 type Stage = {
   idx: number;
   name: string;
   hp: number;
   enemies: [number, number, number][]; // [enemyId, hpMag%, atkMag%]
+  reward?: StageReward[]; // 無ければ省略
 };
+
+// レアリティ別バッジ色(計算機のRARITY_COLORSと一致)。0基本〜5伝説レア。
+const RARITY_BADGE = [
+  "bg-stone-500",
+  "bg-teal-600",
+  "bg-sky-600",
+  "bg-violet-600",
+  "bg-brand text-bg",
+  "bg-rose-600",
+];
+const RARITY_LABEL = ["基本", "EX", "レア", "激レア", "超激レア", "伝説レア"];
 type MapData = {
   id: number;
   grp: number;
@@ -329,16 +342,6 @@ export default function EnemyStages() {
     return [...merged.values()].sort((a, b) => b.real - a.real);
   };
 
-  const stageMaxHp = (st: Stage, crownMult = 1) => {
-    if (!enemies) return 0;
-    let mx = 0;
-    for (const [eid, hpMag] of st.enemies) {
-      const e = enemies.get(eid);
-      if (e) mx = Math.max(mx, Math.round(e.hp * (hpMag / 100) * crownMult));
-    }
-    return mx;
-  };
-
   // マップで選択中の冠の倍率。stars=[冠1,冠2,…]。選択冠が無ければクランプ。
   const crownInfo = (m: MapData) => {
     const stars = m.stars && m.stars.length > 0 ? m.stars : [100];
@@ -405,12 +408,26 @@ export default function EnemyStages() {
                 className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-surface-2"
               >
                 <span>{st.name}</span>
-                <span className="ml-auto text-xs text-ink-dim">
-                  最大HP{" "}
-                  <span className="font-bold text-sky-300">
-                    {stageMaxHp(st, ci.mult).toLocaleString()}
+                {/* クリア報酬(ユニット)。無ければ空白 */}
+                {st.reward && st.reward.length > 0 && (
+                  <span className="ml-auto flex flex-wrap items-center justify-end gap-1">
+                    {st.reward.map((r, i) => (
+                      <span key={i} className="flex items-center gap-1 text-xs">
+                        <span
+                          className={`rounded px-1 py-0.5 text-[9px] font-bold text-white ${
+                            RARITY_BADGE[r.rarity] ?? "bg-stone-500"
+                          }`}
+                        >
+                          {RARITY_LABEL[r.rarity] ?? "?"}
+                        </span>
+                        <span className="font-bold text-amber-200">{r.name}</span>
+                        {r.prob < 100 && (
+                          <span className="text-[10px] text-ink-dim">{r.prob}%</span>
+                        )}
+                      </span>
+                    ))}
                   </span>
-                </span>
+                )}
               </button>
               {openStageIdx === st.idx && (
                 <div className="bg-sunken/60 px-3 py-2">

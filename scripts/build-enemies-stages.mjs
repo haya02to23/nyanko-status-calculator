@@ -2,6 +2,7 @@
 // 出典:
 //   敵ステータス/名前 … battlecatsinfo enemy.json(HPはBCData t_unit.csv と一致を検証=正本相当)
 //   ステージ構成・倍率・日本語名 … battlecatsinfo stage.json / map.json
+//   クリア報酬(ユニット) … battlecatsinfo rewards.json(報酬id→アイコン)でcatId解決→cats.jsonでJP名
 // 実HP = round(敵の基礎HP × HP倍率/100) × ステージ倍率/100  (ステージ倍率は★無し=100%基準)
 // ソースは raw_data/stages/ に同梱(再取得不要)。 使い方: node scripts/build-enemies-stages.mjs
 import fs from "node:fs";
@@ -90,6 +91,35 @@ const enemies = enemyRaw.map((e) => ({
 // ── 2) ステージ + マップ ───────────────────────────────────────
 const stageData = JSON.parse(read("stage.json"));
 const mapData = JSON.parse(read("map.json"));
+
+// ユニット報酬名の解決用。drop=[確率%,報酬id,個数]の報酬idは rewards.json
+// (battlecatsinfo)で名前/アイコンに対応する。報酬id→catId は非線形(id-1000では不可)
+// なので、アイコンパス "/img/u/{catId}/..." からcatIdを取り、cats.json(BCData正本)の
+// JP名+レアリティを引く。アイコンが "/img/r/..."(アイテム)は名前がTW中国語で精度が
+// 出ないため表示対象外(空白)。これでレジェンド報酬等のJP名を正確に解決できる。
+const catsPath = path.join(OUT, "cats.json");
+const cats = fs.existsSync(catsPath) ? JSON.parse(fs.readFileSync(catsPath, "utf8")) : [];
+const catById = new Map(cats.map((c) => [c.id, c]));
+const rewardRaw = JSON.parse(read("rewards.json"));
+// 報酬id → catId (ユニット報酬のみ)。/img/u/{catId}/ のみ採用。
+const rewardToCat = new Map();
+for (const r of rewardRaw) {
+  const m = /\/img\/u\/(\d+)\//.exec(r.icon || "");
+  if (m) rewardToCat.set(r.id, Number(m[1]));
+}
+// 1ステージのdropからユニット報酬だけ抽出 → [{name, rarity, prob}]
+function unitRewards(drop) {
+  if (!Array.isArray(drop)) return [];
+  const out = [];
+  for (const d of drop) {
+    const cid = rewardToCat.get(d[1]);
+    if (cid == null) continue; // ユニット報酬でない(アイテム等)
+    const c = catById.get(cid);
+    if (!c || !c.forms || !c.forms[0]) continue;
+    out.push({ name: c.forms[0].name, rarity: c.rarity, prob: d[0] });
+  }
+  return out;
+}
 const d36 = (s) => parseInt(s, 36);
 // 倍率トークン "hp+atk"(36進, 既定 "2s"=100) → [hpMag, atkMag]
 function decodeMag(tok) {
@@ -125,9 +155,9 @@ for (const key in stageData) {
     if (hasColossus(eid)) colossus = true;
   }
   if (enemyList.length === 0) continue;
-  // クリア特典(レジェンドにゃんこ等のユニット報酬)。drop=[確率,報酬id,数]、
-  // アイテムは低id、ユニット報酬は高id(>=1000)。
-  const hasUnitReward = Array.isArray(st.drop) && st.drop.some((d) => d[1] >= 1000);
+  // クリア特典(レジェンドにゃんこ等のユニット報酬)の有無。報酬id→catId解決で判定。
+  const reward = unitRewards(st.drop);
+  const hasUnitReward = reward.length > 0;
 
   if (!maps.has(mapId)) {
     const m = mapData[mapId];
@@ -151,6 +181,7 @@ for (const key in stageData) {
     name: st.nameJp || st.name || `ステージ${stageIdx}`,
     hp: st.hp, // 拠点(城)HP
     enemies: enemyList,
+    ...(reward.length ? { reward } : {}), // ユニットクリア報酬(無ければ省略)
   });
 }
 const mapsOut = [...maps.values()].sort((a, b) => a.id - b.id);
