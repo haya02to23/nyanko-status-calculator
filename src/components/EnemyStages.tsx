@@ -500,32 +500,43 @@ export default function EnemyStages() {
                   <span className="font-bold">📅 今のイベント開催スケジュール</span>
                   <span className="ml-auto text-xs">外部サイトで見る →</span>
                 </a>
-                {categorized.map((cat) => (
+                {categorized.map((cat) => {
+                  const open = openCategory === cat.key;
+                  return (
                   <div
                     key={cat.key}
-                    className="overflow-hidden rounded-xl border border-line bg-surface"
+                    className={`overflow-hidden rounded-xl border ${
+                      open ? "border-brand/50 bg-sunken" : "border-line bg-surface"
+                    }`}
                   >
                     <button
                       onClick={() => {
-                        setOpenCategory(openCategory === cat.key ? null : cat.key);
+                        setOpenCategory(open ? null : cat.key);
                         setOpenMapId(null);
                         setOpenStageIdx(null);
                       }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-surface-2"
+                      className={`flex w-full items-center gap-2 px-4 py-3 text-left ${
+                        open
+                          ? "sticky top-0 z-10 bg-brand text-bg"
+                          : "hover:bg-surface-2"
+                      }`}
                     >
                       <span className="font-bold">{cat.label}</span>
-                      <span className="text-xs text-ink-dim">{cat.maps.length}マップ</span>
-                      <span className="ml-auto text-ink-dim">
-                        {openCategory === cat.key ? "▲" : "▼"}
+                      <span className={`text-xs ${open ? "text-bg/70" : "text-ink-dim"}`}>
+                        {cat.maps.length}マップ
+                      </span>
+                      <span className={`ml-auto ${open ? "text-bg/80" : "text-ink-dim"}`}>
+                        {open ? "▲" : "▼"}
                       </span>
                     </button>
-                    {openCategory === cat.key && (
-                      <div className="space-y-1.5 border-t border-line bg-sunken/40 p-2">
+                    {open && (
+                      <div className="space-y-1.5 border-l-2 border-brand/50 bg-sunken/40 p-2 pl-2.5">
                         {cat.maps.map(renderMap)}
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </>
             )}
           </div>
