@@ -100,11 +100,10 @@ function decodeMag(tok) {
   return [d36(d || "2s"), d36(r || "2s")];
 }
 
-// 敵id→属性 と uber(超系)判定
+// 敵id→属性。超生命体強襲の判定に使う。
 const traitsById = new Map(enemies.map((e) => [e.id, e.traits]));
-const UBER = ["超生命体", "超賢者", "超獣"];
-const hasUber = (eid) => (traitsById.get(eid) || []).some((t) => UBER.includes(t));
 const hasColossus = (eid) => (traitsById.get(eid) || []).includes("超生命体");
+const LEGEND_GRPS = [0, 9, 16]; // 旧/真/ゼロ レジェンド
 
 // stageId = mapId*1000 + stageIndex、 mapId = grp*1000 + mapIndex
 const maps = new Map();
@@ -117,7 +116,6 @@ for (const key in stageData) {
 
   const enemyList = [];
   let colossus = false;
-  let bossName = null; // 魔王旗付き かつ 超系の敵名(=ボス章の目印)
   for (const line of st.enemyLines.split("|")) {
     const A = line.split(",");
     const eid = parseInt(A[0], 36);
@@ -125,12 +123,11 @@ for (const key in stageData) {
     const [hpMag, atkMag] = decodeMag(A[7]);
     enemyList.push([eid, hpMag, atkMag]);
     if (hasColossus(eid)) colossus = true;
-    const isBoss = A[6] && A[6][0] === "2"; // 魔王(ボス)旗
-    if (isBoss && hasUber(eid) && !bossName) {
-      bossName = enemies.find((e) => e.id === eid)?.name ?? null;
-    }
   }
   if (enemyList.length === 0) continue;
+  // クリア特典(レジェンドにゃんこ等のユニット報酬)。drop=[確率,報酬id,数]、
+  // アイテムは低id、ユニット報酬は高id(>=1000)。
+  const hasUnitReward = Array.isArray(st.drop) && st.drop.some((d) => d[1] >= 1000);
 
   if (!maps.has(mapId)) {
     const m = mapData[mapId];
@@ -140,12 +137,12 @@ for (const key in stageData) {
       name: m?.nameJp || m?.name || `マップ${mapId}`,
       stages: [],
       colossus: false, // 超生命体の敵が出る(超生命体強襲の判定)
-      bossName: null, // 超系のボス(ソラクティス等)がいる章の目印
+      reward: false, // クリア特典(レジェンドにゃんこ入手)のある章
     });
   }
   const mp = maps.get(mapId);
   if (colossus) mp.colossus = true;
-  if (bossName && !mp.bossName) mp.bossName = bossName;
+  if (hasUnitReward && LEGEND_GRPS.includes(mp.grp)) mp.reward = true;
   mp.stages.push({
     idx: stageIdx,
     name: st.nameJp || st.name || `ステージ${stageIdx}`,

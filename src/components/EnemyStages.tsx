@@ -28,7 +28,7 @@ type MapData = {
   name: string;
   stages: Stage[];
   colossus?: boolean; // 超生命体の敵が出る
-  bossName?: string | null; // 超系ボス(ソラクティス等)がいる章
+  reward?: boolean; // クリア特典(レジェンドにゃんこ入手)のある章
 };
 
 // ひらがな→カタカナにして大文字小文字を無視した検索キー
@@ -42,20 +42,28 @@ const norm = (s: string) =>
 // grpName(battlecatsinfo公式)準拠: grp0=旧レジェンド, 9=真レジェンド, 16=ゼロレジェンド,
 // 11=強襲, 14=超獣討伐。降臨はgrpに無く名前で抽出。
 type HomeCat = { key: string; label: string; grp?: number; filter?: (m: MapData) => boolean };
+const isAdvent = (m: MapData) => /降臨/.test(m.name) && m.grp !== 2 && m.grp !== 13;
 const HOME_CATEGORIES: HomeCat[] = [
+  // 降臨はgame8/seesaawiki準拠で 通常/大降臨/狂乱/大狂乱 に分ける
   {
     key: "advent",
     label: "降臨ステージ",
-    filter: (m) => /降臨/.test(m.name) && !/大狂乱/.test(m.name) && m.grp !== 2 && m.grp !== 13,
+    filter: (m) => isAdvent(m) && !/大降臨|狂乱/.test(m.name),
   },
-  { key: "manic", label: "大狂乱降臨", filter: (m) => /大狂乱/.test(m.name) },
+  { key: "advent_big", label: "大降臨", filter: (m) => isAdvent(m) && /大降臨/.test(m.name) },
+  {
+    key: "crazed",
+    label: "狂乱ステージ",
+    filter: (m) => isAdvent(m) && /狂乱/.test(m.name) && !/大狂乱/.test(m.name),
+  },
+  { key: "manic", label: "大狂乱ステージ", filter: (m) => isAdvent(m) && /大狂乱/.test(m.name) },
   { key: "g11", label: "強襲ステージ", filter: (m) => m.grp === 11 && !m.colossus },
   { key: "colossus", label: "超生命体強襲", filter: (m) => m.grp === 11 && !!m.colossus },
   { key: "g14", label: "超獣討伐ステージ", grp: 14 },
   { key: "g12", label: "発掘ステージ", grp: 12 },
   { key: "g16", label: "ゼロレジェンド", grp: 16 },
   { key: "g9", label: "真レジェンド", grp: 9 },
-  { key: "g0", label: "旧レジェンド（ストーリーズ オブ レジェンド）", grp: 0 },
+  { key: "g0", label: "旧レジェンド", grp: 0 },
 ];
 
 // 敵アイコン(public/icons/enemies/{id}.webp)。遅延読込・無ければ非表示。
@@ -266,7 +274,7 @@ export default function EnemyStages() {
     <div
       key={m.id}
       className={`overflow-hidden rounded-xl border bg-surface ${
-        m.bossName ? "border-amber-400/60 ring-1 ring-amber-400/30" : "border-line"
+        m.reward ? "border-amber-400/60 ring-1 ring-amber-400/30" : "border-line"
       }`}
     >
       <button
@@ -277,10 +285,10 @@ export default function EnemyStages() {
         }}
         className="flex w-full items-center gap-2 px-4 py-2.5 text-left hover:bg-surface-2"
       >
-        <span className={`font-bold ${m.bossName ? "text-amber-300" : ""}`}>{m.name}</span>
-        {m.bossName && (
+        <span className={`font-bold ${m.reward ? "text-amber-300" : ""}`}>{m.name}</span>
+        {m.reward && (
           <span className="rounded bg-amber-400/15 px-1.5 py-0.5 text-[10px] text-amber-300">
-            👑 {m.bossName}
+            🎁 クリア特典
           </span>
         )}
         <span className="text-xs text-ink-dim">{m.stages.length}ステージ</span>
