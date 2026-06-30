@@ -14,6 +14,7 @@ import {
   ORB_GRADES,
   orbAtkPctOf,
   orbDmgReductionOf,
+  traitCorrectionMult,
   COMBO_ATK_UP,
   COMBO_HP_UP,
   COMBO_SPEED_UP,
@@ -49,9 +50,17 @@ const RARITY_COLORS = [
 
 const HISTORY_KEY = "nyanko-calc-history";
 
-// 本能玉。攻撃の玉=対象属性に攻撃力アップ、防御の玉=対象属性から被ダメージ減少。
-type OrbKind = "atk" | "def";
+// 本能玉。攻撃/防御の玉はステータス直結。強化系(超ダメージ/めっぽう/打たれ強い強化)は
+// キャラが対象属性にその能力を持つ時のみ既存倍率を底上げする。
+type OrbKind = "atk" | "def" | "massive" | "strong" | "resist";
 type Orb = { kind: OrbKind; trait: string; grade: number }; // grade=ランク1..5(D..S)
+const ORB_KIND_LABEL: Record<OrbKind, string> = {
+  atk: "攻撃の玉",
+  def: "防御の玉",
+  massive: "超ダメージ強化",
+  strong: "めっぽう強い強化",
+  resist: "打たれ強い強化",
+};
 // 対象にできる9属性(battlecatsinfoのORB定義準拠)
 const ORB_TRAITS: { key: string; label: string }[] = [
   { key: "red", label: "赤い敵" },
@@ -270,16 +279,24 @@ export default function Calculator() {
   const hasUltra = !!cat?.talents?.some((t) => t.ultra);
   const orbSlots = !talentsActive || !hasTalents ? 0 : hasUltra && ultraActive ? 2 : 1;
 
+  // 本能・超本能による能力解放を反映した実効ステータス(玉の強化系判定にも使う)
+  const resolved = useMemo(
+    () => (form ? resolveTalents(form, cat?.talents ?? null, activeTalentLv) : null),
+    [form, cat, activeTalentLv]
+  );
+
   // 装着玉を属性ごとに集計し、対象別の実質攻撃力/体力を計算(玉は対象属性時のみ有効)。
   const orbEffects = useMemo(() => {
-    if (!cat || !form || !result || orbSlots === 0) return [];
+    if (!cat || !form || !result || !resolved || orbSlots === 0) return [];
     const active = orbs.slice(0, orbSlots).filter((o): o is Orb => !!o);
     if (!active.length) return [];
-    const byTrait = new Map<string, { atk: number; def: number }>();
+    // 属性ごとに各種類のランク合計を集計
+    type Sums = { atk: number; def: number; massive: number; strong: number; resist: number };
+    const byTrait = new Map<string, Sums>();
     for (const o of active) {
-      const cur = byTrait.get(o.trait) ?? { atk: 0, def: 0 };
-      if (o.kind === "atk") cur.atk += o.grade;
-      else cur.def += o.grade;
+      const cur =
+        byTrait.get(o.trait) ?? { atk: 0, def: 0, massive: 0, strong: 0, resist: 0 };
+      cur[o.kind] += o.grade;
       byTrait.set(o.trait, cur);
     }
     const baseOpt = {
@@ -289,10 +306,33 @@ export default function Calculator() {
       talentLevels: activeTalentLv,
       combos: selectedCombos,
     };
+    const ab = resolved.ab;
+    const tb = treasure > 1; // お宝コンプ相当
     const out = [...byTrait.entries()].map(([trait, r]) => {
+      // 攻撃/防御の玉(ステータス直結)
       const orbAtkPct = orbAtkPctOf(cat.growth, r.atk);
       const dmgRed = orbDmgReductionOf(r.def);
       const res = calcStats(cat, form, { ...baseOpt, orbAtkPct, orbDmgReduction: dmgRed });
+      // 強化系: キャラが対象属性にその能力を持つ時のみ既存倍率を底上げ
+      const targets = !!(resolved.traits as Record<string, boolean>)[trait];
+      type Enh = { kind: OrbKind; applicable: boolean; mult: number; value: number };
+      const enh: Enh[] = [];
+      const pushEnh = (kind: "massive" | "strong" | "resist", has: boolean, isAtk: boolean) => {
+        const rank = r[kind];
+        if (!rank) return;
+        if (!has || !targets) {
+          enh.push({ kind, applicable: false, mult: 1, value: 0 });
+          return;
+        }
+        const boost = { [kind]: rank };
+        const corr = traitCorrectionMult(resolved, trait, tb, boost);
+        const mult = corr ? (isAtk ? corr.atkMult : corr.hpMult) : 1;
+        const value = Math.round((isAtk ? result.atk : result.hp) * mult);
+        enh.push({ kind, applicable: true, mult, value });
+      };
+      pushEnh("massive", ab.massive, true);
+      pushEnh("strong", ab.strong, true);
+      pushEnh("resist", ab.resistant || ab.insanelyTough, false);
       return {
         trait,
         hasAtk: r.atk > 0,
@@ -301,6 +341,7 @@ export default function Calculator() {
         hp: res.hp,
         atkUpPct: r.atk ? Math.round((res.atk / result.atk - 1) * 1000) / 10 : 0,
         dmgRed,
+        enh,
       };
     });
     return out.sort(
@@ -308,13 +349,7 @@ export default function Calculator() {
         ORB_TRAITS.findIndex((t) => t.key === a.trait) -
         ORB_TRAITS.findIndex((t) => t.key === b.trait)
     );
-  }, [cat, form, result, orbSlots, orbs, level, plus, treasure, activeTalentLv, selectedCombos]);
-
-  // 本能・超本能による能力解放を反映した実効ステータス
-  const resolved = useMemo(
-    () => (form ? resolveTalents(form, cat?.talents ?? null, activeTalentLv) : null),
-    [form, cat, activeTalentLv]
-  );
+  }, [cat, form, result, resolved, orbSlots, orbs, level, plus, treasure, activeTalentLv, selectedCombos]);
 
   // 特効/キラー(超獣・超生命体など)。on/offトグルで全ステータスに一括反映する。
   const slayers = useMemo(() => (resolved ? slayerGroupsOf(resolved) : []), [resolved]);
@@ -1213,8 +1248,11 @@ export default function Calculator() {
                             }
                             className="rounded-md border border-line bg-surface-2 px-2 py-1 text-xs outline-none"
                           >
-                            <option value="atk">攻撃の玉</option>
-                            <option value="def">防御の玉</option>
+                            {(Object.keys(ORB_KIND_LABEL) as OrbKind[]).map((k) => (
+                              <option key={k} value={k}>
+                                {ORB_KIND_LABEL[k]}
+                              </option>
+                            ))}
                           </select>
                           <select
                             value={orb.trait}
@@ -1291,12 +1329,29 @@ export default function Calculator() {
                           </span>
                         </span>
                       )}
+                      {e.enh.map((x) =>
+                        x.applicable ? (
+                          <span key={x.kind} className="tabular-nums">
+                            {ORB_KIND_LABEL[x.kind].replace("強化", "")}{" "}
+                            <span className="text-xs text-ink-dim">×{x.mult.toFixed(2)}→</span>{" "}
+                            {x.kind === "resist" ? "実質体力" : "攻撃"}{" "}
+                            <span className="font-bold text-sky-300">
+                              {x.value.toLocaleString()}
+                            </span>
+                          </span>
+                        ) : (
+                          <span key={x.kind} className="text-xs text-amber-400/80">
+                            {ORB_KIND_LABEL[x.kind]}: このキャラ/属性では効果なし
+                          </span>
+                        )
+                      )}
                     </div>
                   ))}
                 </div>
               )}
               <p className="mt-3 text-[11px] leading-relaxed text-ink-dim">
                 ※攻撃の玉=対象属性への攻撃力アップ / 防御の玉=対象属性からの被ダメージ減少(実質体力に換算)。
+                強化系(超ダメージ/めっぽう/打たれ強い)はキャラが対象属性にその能力を持つ時のみ既存倍率を底上げ。
                 効果は対象属性の敵にのみ発動。特攻トグルとは別計算です。
               </p>
             </section>

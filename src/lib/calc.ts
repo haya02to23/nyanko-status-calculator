@@ -287,6 +287,38 @@ export function effectiveRows(
   return rows;
 }
 
+// 対象属性1つに対する 攻撃/体力 補正倍率(超ダメ/極ダメ/めっぽう/打たれ強い系)。
+// 強化系本能玉のボーナスも加味する(超ダメージ強化=+0.1×ランク, めっぽう強い強化=+0.06×ランク,
+// 打たれ強い強化=被ダメ-5×ランク%)。該当能力が無い種類のボーナスは無視される。
+// 補正が無く倍率1なら null。trait=属性キー(red/floating/...)。
+export function traitCorrectionMult(
+  form: { traits: CatForm["traits"]; ab: FormAbilities },
+  trait: string,
+  treasureBonus: boolean,
+  orbBoost?: { massive?: number; strong?: number; resist?: number }
+): { atkMult: number; hpMult: number } | null {
+  const a = form.ab;
+  if (!(form.traits as Record<string, boolean>)[trait]) return null; // 攻撃対象属性でない
+  const bonus = (TREASURE_TRAIT_KEYS as readonly string[]).includes(trait) && treasureBonus;
+  const mt = bonus ? 1 : 0; // massive_t / resist_t (お宝コンプ)
+  const gAtk = bonus ? 0.3 : 0; // good_atk_t
+  const gHp = bonus ? 0.1 : 0; // good_hp_t
+  const mB = (orbBoost?.massive ?? 0) * 0.1; // 超ダメージ強化
+  const sB = (orbBoost?.strong ?? 0) * 0.06; // めっぽう強い強化
+  const rOrb = (orbBoost?.resist ?? 0) * 5; // 打たれ強い強化(被ダメ-%)
+  const atkMult = a.massive
+    ? 3 + mt + mB
+    : a.insaneDamage
+      ? 5 + mt
+      : a.strong
+        ? 1.5 + gAtk + sB
+        : 1;
+  let hpMult = a.resistant ? 4 + mt : a.insanelyTough ? 6 + mt : a.strong ? 1 / (0.5 - gHp) : 1;
+  if (rOrb > 0 && (a.resistant || a.insanelyTough)) hpMult = hpMult / (1 - rOrb / 100);
+  if (atkMult === 1 && hpMult === 1) return null;
+  return { atkMult, hpMult };
+}
+
 // 種族特効・キラー(超獣/超生命体/超賢者/魔女/使徒)。攻撃対象属性とは独立の固定倍率。
 // UI側でon/offトグルにして、ONのものをベース値に乗算する。
 export type SlayerGroup = { key: string; label: string; atkMult: number; hpMult: number };
