@@ -76,7 +76,8 @@ const rangeTypeOf = (t) =>
 
 const enemies = enemyRaw.map((e) => ({
   id: e.i,
-  name: e.jp_name || e.name,
+  // JP名フィールドは battlecatsinfo 側で jp_name → jpName に改称された(両対応)
+  name: e.jpName || e.jp_name || e.name,
   hp: e.hp,
   atk: (e.atk || 0) + (e.atk1 || 0) + (e.atk2 || 0), // 多段は合計
   range: e.range,
