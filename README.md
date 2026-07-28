@@ -22,11 +22,20 @@
 
 補完の仕組み: build-data.mjs 末尾で、BCDataに無いidのユニットを battlecatsinfo から丸ごと追加(ability文字列・trait/immunityビットマスク・成長カーブをデコード)し、本能が欠けている既存ユニットには cat.tsv の talents 列(SkillAcquisitionと同形式)を補完する。
 
-`raw_data/` に元データを同梱。更新時は新しいCSV/TSVに差し替えて:
+### アプデ時の更新手順
+
+battlecatsinfo の最新データを取り直して再生成する:
 
 ```bash
-node scripts/build-data.mjs   # public/data/*.json を再生成
+cd raw_data/stages && for f in enemy.json stage.json map.json rewards.json; do curl -sO "https://battlecatsinfo.github.io/$f"; done
+cd ../bci && for f in cat.json units_scheme.json; do curl -sO "https://battlecatsinfo.github.io/$f"; done
+cd ../.. && node scripts/build-data.mjs && node scripts/build-enemies-stages.mjs
+node scripts/fetch-icons.mjs && node scripts/fetch-enemy-icons.mjs   # 新規分のアイコン(冪等)
 ```
+
+新規ユニットは `raw_data/bci/cat.json` から自動で追加される(BCDataに無いidのみ。
+既存ユニットのステータスは上書きしない)。フィールド対応は build-data.mjs の
+「(3) cat.json からの追加」を参照。敵のJP名は `jpName`(旧 `jp_name`)。
 
 ## 開発
 
