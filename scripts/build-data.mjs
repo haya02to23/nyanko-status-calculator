@@ -372,6 +372,80 @@ for (let id = 0; ; id++) {
     added++;
   }
 
+  // (3) cat.json(battlecatsinfo の新形式)からの追加。
+  // battlecatsinfo は配信形式を TSV から cat.json(構造化JSON)へ移行しており、
+  // TSV には載らない新しいユニット(コラボ・新ガチャ等)はこちらにしか無い。
+  // 対応: attackF=freq(正確な攻撃頻度) / tba は既に2倍済(BCData比) / ab はID→配列のオブジェクト。
+  // 既存863体で hp・atk・range・cost・cd・backswing・freq・growth・ability の一致を検証済み。
+  {
+    const catJsonPath = join(BCI, "cat.json");
+    if (existsSync(catJsonPath)) {
+      const list = JSON.parse(readFileSync(catJsonPath, "utf8"));
+      for (const u of list) {
+        const id = u.i;
+        if (existing.has(id) || cats.some((c) => c.id === id)) continue;
+        const info = u.info ?? {};
+        const curve = levelcurves[info.lvCurve] ?? levelcurves[0];
+        const forms = [];
+        for (const r of u.forms ?? []) {
+          // JP名優先。空でも name が日本語表記ならそれを使う(コラボ名は台湾版でも
+          // 日本語のまま入っている)。繁体字中国語だけの名前は中国語表示になるので出さない。
+          // 例: "衛宮 士郎"(漢字のみだが日本語) は採用、"貓咪塔" は不採用。
+          const jp = (r.jpName || "").trim();
+          const tw = (r.name || "").trim();
+          const isTw = /[貓咪們個爲為與這裡龍鳳蟲媽將軍術護擊獸實體開關陽陰嚕嘰哪兒點陣戰鬥屍煉獄轉蛋雷達寶藏]/.test(tw);
+          const name = jp || (isTw ? "" : tw);
+          if (!name) continue;
+          // ab は {"25":null,"22":[50,120]} 形式 → decodeAbility と同じ {id:[値…]} に正規化
+          const ab = {};
+          for (const k in r.ab ?? {}) ab[num(k)] = Array.isArray(r.ab[k]) ? r.ab[k].map(num) : [];
+          const fab = buildAb(ab);
+          fab.immune = decodeImmune(num(r.imu));
+          // lds=射程開始, ldr=射程幅(どちらも多段分の配列)
+          const mkLd = (i) => {
+            const s = num((r.lds ?? [])[i]);
+            const g = num((r.ldr ?? [])[i]);
+            return s === 0 && g === 0 ? null : { start: s, range: g };
+          };
+          forms.push({
+            name,
+            desc: "",
+            hp: num(r.hp),
+            kb: num(r.kb),
+            speed: num(r.speed),
+            atk: [num(r.atk), num(r.atk1), num(r.atk2)],
+            fore: [num(r.pre), num(r.pre1), num(r.pre2)],
+            abilityHit: [true, num(r.atk1) > 0, num(r.atk2) > 0],
+            tba: Math.round(num(r.tba) / 2), // cat.json は BCData の2倍で入っている
+            range: num(r.range),
+            cost: num(r.price),
+            cd: num(r.cd),
+            area: (num(r.atkType) & 2) !== 0,
+            backswing: num(r.backswing),
+            freq: num(r.attackF),
+            ld: mkLd(0) ?? { start: 0, range: 0 },
+            ld2: mkLd(1),
+            ld3: mkLd(2),
+            traits: decodeTraits(num(r.trait)),
+            ab: fab,
+          });
+        }
+        if (!forms.length) continue;
+        cats.push({
+          id,
+          rarity: num(info.rarity),
+          maxBase: num(info.maxBaseLv) || 0,
+          maxBaseNoEye: num(info.maxBaseLv) || 0,
+          maxPlus: num(info.maxPlusLv) || 0,
+          growth: curve.map(num),
+          forms,
+          talents: null, // 新規ユニットは本能未実装(実装後は cat.json 側に載る)
+        });
+        added++;
+      }
+    }
+  }
+
   // 爆破攻撃(ability 45)の発動率を battlecatsinfo の ability から全キャラに補完。
   // BCData の爆破列は行ごとに列数が変わり不安定なため、クリーンな ability 文字列を使う。
   let expSet = 0;
